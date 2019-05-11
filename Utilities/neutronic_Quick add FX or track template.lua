@@ -1,5 +1,5 @@
 --[[
-Description: Quick add FX or track template
+Description: Smart quick add FX or track template
 Version: 1.0
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
@@ -55,7 +55,7 @@ function add_fx()
       reaper.PreventUIRefresh(-1)
     end
   else
-    reaper.MB("No FX matched your request", "REASCRIPT Query", 0)
+    reaper.MB("No FX matched your request.", "REASCRIPT Query", 0)
   end
 end
 
@@ -72,8 +72,12 @@ function add_track_fx()
     reaper.Undo_EndBlock("Add "..undo_name.." to selected "..t_or_t, 2)
       end
   else
-    reaper.MB("Select a track to put the fx on", "REASCRIPT Query", 0)
-    track_wait()
+    local answ = reaper.MB("Select a track to put the fx on.", "REASCRIPT Query", 1)
+    if answ == 1 then
+      track_wait()
+    else
+      return
+    end
   end
 end
 
@@ -134,8 +138,12 @@ function add_item_fx()
       end
     reaper.Undo_EndBlock("Add "..undo_name.." to selected "..dest_count, -1)
   else
-    reaper.MB("Select an item to put the FX on", "REASCRIPT Query", 0)
-    item_wait()
+    local answ = reaper.MB("Select an item to put the FX on.", "REASCRIPT Query", 1)
+    if answ == 1 then
+      item_wait()
+    else
+      return
+    end
   end
 end
 
