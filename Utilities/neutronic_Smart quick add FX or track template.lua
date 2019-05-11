@@ -72,7 +72,7 @@ function add_track_fx()
     reaper.Undo_EndBlock("Add "..undo_name.." to selected "..t_or_t, 2)
       end
   else
-    reaper.MB("Select a track first", "REASCRIPT Query", 0)
+    reaper.MB("Select a track to put the fx on", "REASCRIPT Query", 0)
     track_wait()
   end
 end
@@ -134,7 +134,7 @@ function add_item_fx()
       end
     reaper.Undo_EndBlock("Add "..undo_name.." to selected "..dest_count, -1)
   else
-    reaper.MB("Select an item first", "REASCRIPT Query", 0)
+    reaper.MB("Select an item to put the FX on", "REASCRIPT Query", 0)
     item_wait()
   end
 end
@@ -396,7 +396,7 @@ function add_tr_temp()
 end
 
 function main()
-  local retval, data = reaper.GetUserInputs("Smart Add...", 1, "FX or track template keyword(s):,extrawidth=88", "")
+  local retval, data = reaper.GetUserInputs("Smart Quick Add...", 1, "FX or track template keyword(s):,extrawidth=88", "")
   console("User Data: ".. data, 1, 1)
   if retval then
     name_parts = {}
