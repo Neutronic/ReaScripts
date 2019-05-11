@@ -1,5 +1,5 @@
 --[[
-Description: Smart quick add FX or track template
+Description: Quick add FX or track template
 Version: 1.0
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
