@@ -1,5 +1,5 @@
 --[[
-Description: Smart quick add FX or track template
+Description: Quick add FX or track template
 Version: 1.0
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
@@ -404,7 +404,7 @@ function add_tr_temp()
 end
 
 function main()
-  local retval, data = reaper.GetUserInputs("Smart Quick Add...", 1, "FX or track template keyword(s):,extrawidth=88", "")
+  local retval, data = reaper.GetUserInputs("Quick Add...", 1, "FX or track template keyword(s):,extrawidth=88", "")
   console("User Data: ".. data, 1, 1)
   if retval then
     name_parts = {}
