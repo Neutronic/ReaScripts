@@ -8,6 +8,7 @@ Changelog:
     + Added input_ovrd option to allow users hardcode a search query
 Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
+  Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 About: 
   Adds FX to selected track(s)/take(s) or track template{s)
 --]]
