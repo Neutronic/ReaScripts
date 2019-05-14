@@ -1,9 +1,11 @@
 --[[
-Description: Quick add FX or track template
-Version: 1.0
+Description: quick add FX or track template
+Version: 1.01
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 Changelog:
+  v1.01
+    + Added input_ovrd option to allow users hardcode a search query
 Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
 About: 
@@ -14,12 +16,14 @@ About:
 
 --require("dev")
 function console() end
+
 local vst_order = 23 -- 23 to scan VST2 first, 32 to scan VST3 first
+local input_ovrd = "" -- put FX or track template query inside the quotes to hardcode it; otherwise leave it as is
 local sel_tr_count = reaper.CountSelectedTracks()
 local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
-local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t
+local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t, retval, data
 local r_path = reaper.GetExePath()
 local dir_list = {}
 local file_list = {}
@@ -404,9 +408,13 @@ function add_tr_temp()
 end
 
 function main()
-  local retval, data = reaper.GetUserInputs("Quick Add...", 1, "FX or track template keyword(s):,extrawidth=88", "")
+  if input_ovrd == "" then
+    retval, data = reaper.GetUserInputs("Quick Add FX or Track Template", 1, "FX or track template keyword(s):,extrawidth=88", "")
+  else
+    data = input_ovrd
+  end
   console("User Data: ".. data, 1, 1)
-  if retval then
+  if retval or input_ovrd ~= "" then
     name_parts = {}
     local i = 0
     for word in data:gmatch("[%w%p]+") do
