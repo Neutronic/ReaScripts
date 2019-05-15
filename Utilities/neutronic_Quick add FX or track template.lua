@@ -33,8 +33,8 @@ if OS == "\\" then -- if WIN
 else -- if UNIX
   sep = "/"
 end
-local vst = reaper.GetResourcePath() .. sep .. "reaper-vstplugins64.ini"
---local js = reaper.GetExePath().. sep .. "reaper-jsfx.ini"
+local vst = r_path .. sep .. "reaper-vstplugins64.ini"
+--local js = r_path .. sep .. "reaper-jsfx.ini"
 --local js_ini = reaper.file_exists(js)
 --[[if not js_ini then
   reaper.MB("reaper-jsfx.ini file not found. FX browser is about to be open to create the file.",
