@@ -23,7 +23,7 @@ local sel_tr_count = reaper.CountSelectedTracks()
 local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
-local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t, retval, data, js_name
+local name, name_parts, temp_line, prefix, input, undo_name, plugs, t_or_t, retval, data, js_name, v_s
 local r_path = reaper.GetResourcePath()
 local dir_list = {}
 local file_list = {}
@@ -207,11 +207,11 @@ end
 function js_match(js, plugs)
   list_dir("Effects")
   for i = 1, #file_list do
-    local n = 0
-    for l in io.lines(r_path..sep.."Effects"..sep..file_list[i][1]) do
-       n = n + 1
+    local file = io.open(r_path..sep.."Effects"..sep..file_list[i][1])
+    for l in file:lines() do
        if l:find("desc:") then js_name = l:gsub("desc:", "") break end
     end
+    file:close() 
     table.insert(plugs, "VST2:JS:||" .. file_list[i][1] .. "||" .. js_name)
   end
 end
@@ -251,8 +251,9 @@ function gen_name(plugs)
     for m = 1, #name_parts do
       if not name_parts[m]:match("^/") then
         local exclude = string.match(name_parts[m], "^%%%-.+")
+        if m ~= #name_parts then v_s = v:gsub("VST%d:", "") else v_s = v end
         if exclude then
-          for word in v:gmatch("[%w%-/]+") do
+          for word in v_s:gmatch("[%w%-/]+") do
             temp_line = word:lower():find("^"..name_parts[m]:lower():sub(3))
             if temp_line then
               temp_line = nil
@@ -265,7 +266,7 @@ function gen_name(plugs)
             goto LOOP_CONT
           end
         else
-          for word in v:gmatch("[%w%-/]+") do
+          for word in v_s:gmatch("[%w%-/]+") do
             temp_line = word:lower():match(name_parts[m]:lower()) -- match("^"..name_parts[m]:lower())
             if temp_line then
               break
@@ -384,8 +385,15 @@ function list_dir(match, ext)
           if file:match("[^%.]-$") == ext then
             file = file:gsub("%." .. ext, "")
             table.insert(file_list, {file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})
-          elseif file:match(".js") or not file:match("%.") then
-            table.insert(file_list, {dir_list[i]:gsub(sep .. match .. sep, "") .. [[]] .. sep .. file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})
+          elseif file:match("^.+jsfx$") or not file:match("%.") then
+            local dir = dir_list[i]:gsub(sep .. match, "")
+            if dir ~= "" then
+              --reaper.ShowConsoleMsg(dir .. sep .. file .. "\n")
+              table.insert(file_list, {dir .. sep .. file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})
+            else
+              --reaper.ShowConsoleMsg(dir .. file .. "\n")
+              table.insert(file_list, {file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})  
+            end
           end
           m = m + 1
         end
@@ -458,6 +466,7 @@ function main()
   else
     data = input_ovrd
   end
+  if data == "" then return end
   console("User Data: ".. data, 1, 1)
   if retval or input_ovrd ~= "" then
     name_parts = {}
