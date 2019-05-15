@@ -17,14 +17,13 @@ About:
 
 --require("dev")
 function console() end
-
 local vst_order = 23 -- 23 to scan VST2 first, 32 to scan VST3 first
 local input_ovrd = "" -- put FX or track template query inside the quotes to hardcode it; otherwise leave it as is
 local sel_tr_count = reaper.CountSelectedTracks()
 local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
-local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t, retval, data
+local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t, retval, data, js_name
 local r_path = reaper.GetExePath()
 local dir_list = {}
 local file_list = {}
@@ -35,9 +34,9 @@ else -- if UNIX
   sep = "/"
 end
 local vst = reaper.GetExePath() .. sep .. "reaper-vstplugins64.ini"
-local js = reaper.GetExePath().. sep .. "reaper-jsfx.ini"
-local js_ini = reaper.file_exists(js)
-if not js_ini then
+--local js = reaper.GetExePath().. sep .. "reaper-jsfx.ini"
+--local js_ini = reaper.file_exists(js)
+--[[if not js_ini then
   reaper.MB("reaper-jsfx.ini file not found. FX browser is about to be open to create the file.",
                                       "REASCRIPT Query", 0) 
   
@@ -45,10 +44,15 @@ if not js_ini then
     reaper.Main_OnCommand(40271, 1)
   end                                
   return
-end
+end]]
 
 function add_fx()
-  match()
+  if name_parts[1]:match("^%%%*") ~= "%*" then
+    match()
+  else
+    list_dir("FXChains", "RfxChain")
+    gen_fxchain()
+  end
   if name then
     if not dest or dest == "/i" then
       reaper.PreventUIRefresh(1)
@@ -72,9 +76,9 @@ function add_track_fx()
       master_fx()
       track_or_tracks()
       if dest == "/i" then -- if input fx then
-    reaper.Undo_EndBlock("Add input "..undo_name.." to selected "..t_or_t, 2)
+    reaper.Undo_EndBlock("Add input "..undo_name.." to selected "..t_or_t, -1)
       else
-    reaper.Undo_EndBlock("Add "..undo_name.." to selected "..t_or_t, 2)
+    reaper.Undo_EndBlock("Add "..undo_name.." to selected "..t_or_t, -1)
       end
   else
     local answ = reaper.MB("Select a track to put the fx on.", "REASCRIPT Query", 1)
@@ -201,12 +205,14 @@ function vst_match(vst, plugs)
 end
 
 function js_match(js, plugs)
-  for line in io.lines(js) do
-    if line:find("NAME") then
-      local _, start = line:find('NAME ')
-      line = line:sub(start+1)
-      table.insert(plugs, "VST2:JS: " .. line)
+  list_dir("Effects")
+  for i = 1, #file_list do
+    local n = 0
+    for l in io.lines(r_path..sep.."Effects"..sep..file_list[i][1]) do
+       n = n + 1
+       if l:find("desc:") then js_name = l:gsub("desc:", "") break end
     end
+    table.insert(plugs, "VST2:JS:||" .. file_list[i][1] .. "||" .. js_name)
   end
 end
 
@@ -277,28 +283,64 @@ function gen_name(plugs)
    
     if temp_line then
       if v:find("JS") then
-        name = v:sub(v:find("JS:")+3)
-        --name = name:match("[%w%p]+")
-        name = name:match('.+"JS:'):sub(2, -6):gsub('"', "")
-        undo_name = v:gsub(v:match('.+JS:%s'), "") -- cut to JS in the name
-        if undo_name:find("%(") then -- if there is a "(" in the string
-          undo_name = undo_name:gsub("[^(]+$", "")
-          undo_name = undo_name:sub(0, -3)
-        else
-          undo_name = undo_name:sub(0, -2)
-        end
+        name = v:match("||.+||"):gsub("|", "")
+        undo_name = v:gsub(".+||", ""):gsub(" %(.+%)", "")
       else
-        name = v
-        local _, str_end = name:find(".-%!") -- find exclamation point
-        if str_end then
-          name = name:sub(0, str_end - 1) -- truncate to exclamation point
-        end
-        local _, str_end = name:find(".-%(") -- find parenthesis
-        undo_name = name:sub(6, str_end - 2)
+        name = v:gsub("!.+", "")
+        undo_name = name:gsub("VST%d:", ""):gsub(" %(.+%)", "")
       end
         console("Plug-in name: " .. name, 1)
       break
     elseif not temp_line and i == #plugs then
+      name = nil
+    end
+  end 
+end
+
+function gen_fxchain()
+  for i, v in ipairs(file_list) do
+    for m = 1, #name_parts do
+      if m == 1 then
+        name_parts[1] = name_parts[1]:gsub("%*", "")
+      end
+      if not name_parts[m]:match("^/") then
+        local exclude = string.match(name_parts[m], "^%%%-.+")
+        if exclude then
+          for word in v[1]:gmatch("[%w%-/]+") do
+            temp_line = word:lower():find("^"..name_parts[m]:lower():sub(3))
+            if temp_line then
+              temp_line = nil
+              goto LOOP_END
+            end
+          end
+          if temp_line then
+          else
+            temp_line = 1
+            goto LOOP_CONT
+          end
+        else
+          for word in v[1]:gmatch("[%w%-/]+") do
+            temp_line = word:lower():match(name_parts[m]:lower()) -- match("^"..name_parts[m]:lower())
+            if temp_line then
+              break
+            end
+          end
+          if not temp_line then
+            break
+          end
+        end
+        ::LOOP_CONT::
+      end
+    end
+    
+    ::LOOP_END::
+   
+    if temp_line then
+      name = [[]] .. v[2]:gsub(r_path .. sep .. "FXChains" .. sep, "") .. v[1] .. [[]] .. ".RfxChain"
+      undo_name = v[1]
+        console("Plug-in name: " .. name, 1)
+      break
+    elseif not temp_line and i == #file_list then
       name = nil
     end
   end 
@@ -323,7 +365,7 @@ function list_dir(match, ext)
     repeat
       dir = reaper.EnumerateSubdirectories([[]] .. r_path .. [[]], i)
       if dir then
-        if dir:match(match) then
+        if dir:match("^"..match) then
           local dir = sep..dir
           table.insert(dir_list, dir)
           sub_d_check(dir)
@@ -342,6 +384,8 @@ function list_dir(match, ext)
           if file:match("[^%.]-$") == ext then
             file = file:gsub("%." .. ext, "")
             table.insert(file_list, {file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})
+          elseif file:match(".js") or not file:match("%.") then
+            table.insert(file_list, {dir_list[i]:gsub(sep .. match .. sep, "") .. [[]] .. sep .. file, [[]] .. r_path .. dir_list[i] .. [[]] .. sep})
           end
           m = m + 1
         end
