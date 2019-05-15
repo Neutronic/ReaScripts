@@ -24,7 +24,7 @@ local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
 local name, name_parts, temp_line, prefix, plugs, input, undo_name, t_or_t, retval, data, js_name
-local r_path = reaper.GetExePath()
+local r_path = reaper.GetResourcePath()
 local dir_list = {}
 local file_list = {}
 local OS, sep, dest = package.config:sub(1,1)
