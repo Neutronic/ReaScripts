@@ -33,7 +33,7 @@ if OS == "\\" then -- if WIN
 else -- if UNIX
   sep = "/"
 end
-local vst = reaper.GetExePath() .. sep .. "reaper-vstplugins64.ini"
+local vst = reaper.GetResourcePath() .. sep .. "reaper-vstplugins64.ini"
 --local js = reaper.GetExePath().. sep .. "reaper-jsfx.ini"
 --local js_ini = reaper.file_exists(js)
 --[[if not js_ini then
