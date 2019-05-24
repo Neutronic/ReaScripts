@@ -6,8 +6,9 @@ Donation: https://paypal.me/SIXSTARCOS
 Changelog:
 Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
+  Script's forum thread: https://forum.cockos.com/showthread.php?t=220867
 About: 
-  Provides automatic MIDI controller initialization for REAPER.
+  It's a background script that provides automatic MIDI controller initialization for REAPER.
 --]]
 
 -- Licensed under the GNU GPL v3
