@@ -70,7 +70,9 @@ function add_fx()
     return
   end
   for i = 1, #plugs_rel do
-    console("Match " .. i .. ": " .. plugs_rel[i][1], 1)
+    local l
+    if type(plugs_rel[i][1]) == "table" then  l = plugs_rel[i][1][1] else l = plugs_rel[i][1] end
+    console("Match " .. i .. ": " .. l, 1)
   end
   if not dest or dest == "/i" then
     reaper.PreventUIRefresh(1)
