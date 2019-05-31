@@ -1,11 +1,18 @@
 --[[
 Description: quick add FX or track template
-Version: 1.1
+About: adds FX or track template{s) to selected track(s)/take(s)
+Version: 1.2
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
+License: GNU GPL v3
+Links:
+  Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
+  Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
+  v1.00 - May 11 2019
+    + initial release
   v1.01 - May 14 2019
-    + Added input_ovrd option to allow users hardcode a search query
+    + added input_ovrd option to allow users hardcode a search query
   v1.1 - May 22 2019
     + 32-bit support
     + .RfxChain support
@@ -13,31 +20,48 @@ Changelog:
     + ability to choose the FX search order
     + in-script help with complete syntax list
     # improved overall script's logic
-Links:
-  Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
-  Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
-About: 
-  Adds FX to selected track(s)/take(s) or track template{s)
+  v1.2 - May 31 2019
+    + ability to apply track templates to selected tracks
+    # moved in-script help to console
 --]]
-
--- Licensed under the GNU GPL v3
 
 --require("dev")
 function console() end
 
-local input_ovrd = "" -- put FX or track template query inside the quotes to hardcode it; otherwise leave it as is
+---------- USER DEFINABLES ----------
+
+local input_ovrd = "" -- put FX or track template query inside the quotes to hardcode it
+local fx_a = "VST2"
+local fx_b = "VST3"
+local fx_c = "JS"
+local fx_d = "CHAIN"
+local fx_type = {fx_d, fx_a, fx_b, fx_c} -- the search order of FX types. Can be reordered
+
+----- change the values below to true to activate the options or false to disable
+
+local search_track_name = false -- silently feed track names to the script
+
+local keep_states = { -- what original track info to preserve when applying track templates
+GROUP_FLAGS = true, -- track group membership
+ISBUS = true, -- folder states (affects only templates containing a single track)
+ITEMS = true, -- track items
+MAINSEND = true, -- master send / parent channels
+MUTESOLO = false, -- mute / solo
+REC = true, -- track record arm status / input / monitoring
+TRACKHEIGHT = true, -- track height
+VOLPAN = false -- volume / pan
+}
+
+-------------------------------------
+
+keep_states.GROUP_FLAGS_HIGH = keep_states.GROUP_FLAGS
 local sel_tr_count = reaper.CountSelectedTracks()
 local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
 local name, name_parts, part_match, l, input, undo_name, t_or_t, retval, data, js_name, v_s, dest,
-      dest_count, fx_ch_list, fx_i, plugs, vst
+      dest_count, fx_ch_list, fx_i, plugs, vst, sel_tr, track_1_sub, content, tracks
 local r_path = reaper.GetResourcePath()
-local fx_a = "VST2"
-local fx_b = "VST3"
-local fx_c = "JS"
-local fx_d = "CHAIN"
-local fx_type = {fx_d, fx_a, fx_b, fx_c} -- the search order of FX types. Can be reordered.
 local dir_list = {}
 local file_list = {}
 local plugs_rel = {}
@@ -86,6 +110,7 @@ function add_fx()
 end
 
 function add_track_fx()
+  local pass
   if sel_tr_count > 0 or is_m_sel then
     reaper.Undo_BeginBlock()
       is_input()
@@ -104,6 +129,127 @@ function add_track_fx()
       track_wait()
     else
       return
+    end
+  end
+end
+
+function flush_fx(tr, i)
+  local fx_count = reaper.TrackFX_GetCount(tr)
+  for m = 0, fx_count do
+    reaper.TrackFX_SetOffline(tr, i, true)
+  end
+  for m = 0, fx_count do
+    reaper.TrackFX_Delete(tr, 0)
+  end
+end
+
+function template_single(i)
+  track_1_sub = tracks[1]
+  local tr = reaper.GetSelectedTrack(0, i)
+  flush_fx(tr, i)
+  for k, v in pairs(sel_tr[i+1]["states"]) do -- recall states
+    if tracks[1]:match(k) then
+      track_1_sub = track_1_sub:gsub(k..".-\n", v, 1)
+    else
+      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0  "..v, 1)
+    end
+  end
+  if keep_states.ITEMS == true then
+    for m = #sel_tr[i+1]["items"], 1, -1 do -- recall items
+      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0"..sel_tr[i+1]["items"][m].."\n")
+    end
+  end
+  reaper.SetTrackStateChunk(tr, track_1_sub, false)
+end
+
+function template_multi(first_sel_tr, first_sel_tr_idx)
+  for i = 0, #tracks do
+    if i == #tracks then
+      template_single(0)
+    elseif i ~= 0 then
+      reaper.InsertTrackAtIndex(first_sel_tr_idx + i, false)
+      local tr = reaper.GetTrack(0, first_sel_tr_idx + i)
+      reaper.SetTrackStateChunk(tr, tracks[i+1], false)
+    end
+  end
+end
+
+function keepers(tracks, tr_chunk, state, i)
+  if state == "ISBUS" and #tracks > 1 then return end
+  local save_state = tr_chunk:match(state..".-\n")
+  sel_tr[i+1]["states"][state] = save_state
+end
+
+function apply_template(template) 
+  local fn = string.gsub(template, "\\", "/")
+  local file = io.open(fn)
+  content = file:read("*a")
+  file:close()
+  
+  local first_sel_tr_idx
+  
+  tracks = {}
+  
+  content = content:gsub("{.-}", "")
+  
+  repeat
+    local track = content:match("(<TRACK.-)>(\n<TR)")
+    if track then
+      track = track..">\n"
+      table.insert(tracks, track)
+      track = track:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%0")
+      content = content:gsub(track, "")
+    end
+  until not track
+  table.insert(tracks, content)
+  
+  if content == "" or sel_tr_count == 0 then bla = 1 close_undo() return end  
+  
+  if not search_track_name then
+    first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
+  else
+    first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, pass), "IP_TRACKNUMBER") - 1
+  end
+  
+  first_sel_tr_idx = math.floor(first_sel_tr_idx)
+  
+  sel_tr = {}
+  for i = 0, sel_tr_count -1 do
+    local tr = reaper.GetSelectedTrack(0, i)
+    sel_tr[i+1] = {states = {}}
+    local tr_chunk = select(2, reaper.GetTrackStateChunk(tr, "", false))
+    if keep_states.ITEMS == true then
+      sel_tr[i+1].items = {}
+      for item in tr_chunk:gmatch("<ITEM.->\n>") do
+        table.insert(sel_tr[i+1].items, item)
+      end
+    end
+    for k, v in pairs(keep_states) do
+      if v == true then
+        keepers(tracks, tr_chunk, k, i)
+      end
+    end
+  end
+
+  for i = 1, #tracks do -- fix sends
+    tracks[i] = tracks[i]:gsub("(AUXRECV )(%d+)", function(a, b) b = tonumber(b) + first_sel_tr_idx return a..b end)
+  end
+  
+  if not search_track_name and #tracks > 1 then
+    template_multi(first_sel_tr, first_sel_tr_idx)
+  elseif search_track_name then
+    if #tracks > 1 then
+      template_multi(first_sel_tr, first_sel_tr_idx)
+    else
+      template_single(pass)
+    end
+    if sel_tr_count - pass > 1 then
+      pass = pass + 1
+      main()
+    end
+  else
+    for i = 0, sel_tr_count - 1 do
+      template_single(i)
     end
   end
 end
@@ -402,16 +548,27 @@ function list_dir(match, ext)
 end
 
 function add_tr_temp(v)
-  local template_inst
+  local template_inst, apply, tt_mode, name
   for i, a in ipairs(name_parts) do -- check for TT number flag
     if a:match("/%d+") then
       template_inst = a:match("%d+")
       break
     end
   end
+  
+  for i, a in ipairs(name_parts) do -- check for apply flag
+    if a:match("/a") then
+      apply = true
+      break
+    end
+  end
+  
   local track_template = [[]] .. v[2] .. v[1] .. [[]] .. ".RTrackTemplate"
-  if track_template then
-    reaper.Undo_BeginBlock()
+  
+  reaper.Undo_BeginBlock()
+  if apply then
+    apply_template(track_template)
+  else
       local t_temp = {}
       if template_inst then
         for i = 1, template_inst do
@@ -424,7 +581,21 @@ function add_tr_temp(v)
       else
         reaper.Main_openProject(track_template)
       end      
-    reaper.Undo_EndBlock("Insert " .. v[1], -1)
+  end
+  
+  if apply or search_track_name then
+    tt_mode = "Apply"
+  else
+    tt_mode = "Insert"
+  end
+  
+  if search_track_name and sel_tr_count > 1 then
+    name = "track templates"
+  else
+    name = v[1]
+  end
+  if content ~= "" then
+   reaper.Undo_EndBlock(tt_mode .. " " .. name, -1)
   end
   console("Template path: " .. track_template, 1)
 end
@@ -473,15 +644,45 @@ function stop_str(str)
   end
 end
 
+function help()
+  reaper.ShowConsoleMsg("You can use the script to add track FX, input FX, take FX, FX chains"..
+            " and track templates. The script supports both full words and partial keywords.\n\n"..
+            "When adding FX you can use:\n/i flag to add input track FX (e.g. gate /i);\n" ..
+            "/t flag for take FX (e.q. EQ /t);\n"..
+            "vst2/vst3/js/chain keyword to force either format (e.g pro-q vst3).\n\n"..
+            "Track templates specifics:\n"..
+            "to add a track template use . prefix with the first word (eg .soft piano);\n"..
+            "/n flag to add multiple instances of a template (eg .bgv /4);\n"..
+            "/a flag to apply templates to existing tracks (eg .strings /a).\n\n"..
+            "Common syntax:\n"..
+            "put keywords in quotes to do an exact search (e.g. \".vox adlib\" /2);\n"..
+            "use the - prefix to exclude keywords (e.g. comp -cockos).\n\n"..
+            "Type in the $ sign to donate. Thanks!\n\n\n\n"..
+            "For more information visit the script's page:\n"..
+            "https://forum.cockos.com/showthread.php?t=220800", "Quick Add Help")
+end
+
 function main()
-  if input_ovrd == "" then
+  if search_track_name == true and sel_tr_count > 0 then
+    local tr
+    if not pass then
+      pass = 0
+      tr = reaper.GetSelectedTrack(0, pass)
+    else
+      tr = reaper.GetSelectedTrack(0, pass)
+    end
+    local tr_name = select(2, reaper.GetTrackName(tr))
+    data = "."..tr_name.." /a"
+  elseif search_track_name == false and input_ovrd == "" then
     retval, data = reaper.GetUserInputs("Quick Add FX or Track Template", 1, "FX or track template ('?' for help):,extrawidth=88", "")
-  else
+  elseif input_ovrd ~= "" then
     data = input_ovrd
+  else
+    data = ""
   end
   if data == "" then return end
   console("Input Data: ".. data, 1, 1)
-  if retval or input_ovrd ~= "" then
+  if retval or input_ovrd ~= "" or search_track_name then
     name_parts = {}
     local i = 0
     for word in data:gmatch("[%w%p]+") do
@@ -527,18 +728,7 @@ function main()
     elseif name_parts[1]:match("^%%%$$") and #name_parts == 1 then -- donate
       url_open("https://paypal.me/SIXSTARCOS")
     elseif name_parts[1]:match("^%%%?$") and #name_parts == 1 then
-      reaper.MB("You can use the script to add track FX, input FX, take FX, FX chains"..
-                " and track templates. The script supports both full words and partial keywords.\n\n"..
-                "When adding FX you can use:\n/i flag to add input track FX (e.g. gate /i);\n" ..
-                "/t flag for take FX (e.q. EQ /t);\n"..
-                "vst2/vst3/js keyword to force either format (e.g pro-q vst3).\n\n"..
-                "Track templates specifics:\n"..
-                "To add a track template use . prefix with the first word (eg .soft piano).\n"..
-                "To add multiple instance of a template use /n flag (eg .bgv /4).\n\n"..
-                "Common syntax:\n"..
-                "put keywords in quotes to do an exact search (e.g. \".vox adlib\" /2);\n"..
-                "use the - prefix to exclude keywords (e.g. comp -cockos).\n\n"..
-                "Type in the $ sign to donate. Thanks!", "Quick Add Help", 0)
+      help()
     elseif name_parts[1]:match("^%%%.") or name_parts[1]:match("^\"%%%.") then -- if template
       list_dir("TrackTemplates", "RTrackTemplate")
       name_parts[1] = name_parts[1]:gsub("%%.", "")
