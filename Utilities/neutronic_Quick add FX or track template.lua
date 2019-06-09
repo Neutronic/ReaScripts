@@ -23,6 +23,8 @@ Changelog:
   v1.2 - May 31 2019
     + ability to apply track templates to selected tracks
     # moved in-script help to console
+  v1.25 - June 09 2019
+    + added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types
 --]]
 
 --require("dev")
@@ -649,7 +651,7 @@ function help()
             " and track templates. The script supports both full words and partial keywords.\n\n"..
             "When adding FX you can use:\n/i flag to add input track FX (e.g. gate /i);\n" ..
             "/t flag for take FX (e.q. EQ /t);\n"..
-            "vst2/vst3/js/chain keyword to force either format (e.g pro-q vst3).\n\n"..
+            "2/3/j/c as the first keyword to force vst2/vst3/js/chain type (e.g. 3 pro-q).\n\n"..
             "Track templates specifics:\n"..
             "to add a track template use . prefix with the first word (eg .soft piano);\n"..
             "/n flag to add multiple instances of a template (eg .bgv /4);\n"..
@@ -660,6 +662,20 @@ function help()
             "Type in the $ sign to donate. Thanks!\n\n\n\n"..
             "For more information visit the script's page:\n"..
             "https://forum.cockos.com/showthread.php?t=220800", "Quick Add Help")
+end
+
+function fx_type_sh()
+  if #name_parts > 1 then
+    if name_parts[1]:match("^2$") then
+      name_parts[1] = fx_a
+    elseif name_parts[1]:match("^3$") then
+      name_parts[1] = fx_b
+    elseif name_parts[1]:match("^j$") then
+      name_parts[1] = fx_c
+    elseif name_parts[1]:match("^c$") then
+      name_parts[1] = fx_d
+    end
+  end
 end
 
 function main()
@@ -735,6 +751,10 @@ function main()
       console("Name part 1: " .. name_parts[1], 1)
       gen_name("TEMPLATE")
     else
+      fx_type_sh()
+      for i, v in ipairs(name_parts) do
+        console("Name part" .. i.. ": ".. name_parts[i], 1)
+      end
       add_fx()
     end
   end
