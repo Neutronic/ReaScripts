@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="Neutronic ReaScripts" commit="22b536daf5177f0a442b20f1c407da67ea61431b">
+  <category name="Utilities">
+    <reapack name="neutronic_MIDI plug and play.lua" type="script" desc="MIDI Plug and Play">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 It's a background script that provides automatic MIDI controller initialization for REAPER.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile:</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220867">Script's forum thread:</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2019-05-13T18:57:39Z">
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/bc60d5349af092af8af634e34d57151f86988c14/Utilities/neutronic_MIDI%20plug%20and%20play.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="quick add FX or track template">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 adds FX or track template\{s) to selected track(s)/take(s)\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile:</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220800">Script's forum thread:</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2019-05-11T17:33:31Z">
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/61d082d8e115cebca98f3e6d5e0f9d24aac959f7/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+      </version>
+      <version name="1.01" author="Neutronic" time="2019-05-14T15:15:31Z">
+        <changelog><![CDATA[v1.01
+  + Added input_ovrd option to allow users hardcode a search query]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/e258ed63aa732b4087f5688a7e5897d564fe0137/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+      </version>
+      <version name="1.2" author="Neutronic" time="2019-05-31T18:33:50Z">
+        <changelog><![CDATA[v1.00 - May 11 2019
+  + initial release
+v1.01 - May 14 2019
+  + added input_ovrd option to allow users hardcode a search query
+v1.1 - May 22 2019
+  + 32-bit support
+  + .RfxChain support
+  + exact match search ability using quotes
+  + ability to choose the FX search order
+  + in-script help with complete syntax list
+  # improved overall script's logic
+v1.2 - May 31 2019
+  + ability to apply track templates to selected tracks
+  # moved in-script help to console]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/bf8c9f0724c3212c0fcda15e2adc5454bb3ea94f/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+      </version>
+    </reapack>
+  </category>
+</index>
