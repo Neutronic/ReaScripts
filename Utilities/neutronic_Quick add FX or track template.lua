@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: adds FX or track template{s) to selected track(s)/take(s)
-Version: 1.2
+Version: 1.25
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
