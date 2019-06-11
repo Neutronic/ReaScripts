@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic ReaScripts" commit="22b536daf5177f0a442b20f1c407da67ea61431b">
+<index version="1" name="Neutronic ReaScripts" commit="1331e689063ff76a81232122889e00cf267039ee">
   <category name="Utilities">
     <reapack name="neutronic_MIDI plug and play.lua" type="script" desc="MIDI Plug and Play">
       <metadata>
@@ -18,7 +18,7 @@
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/bc60d5349af092af8af634e34d57151f86988c14/Utilities/neutronic_MIDI%20plug%20and%20play.lua</source>
       </version>
     </reapack>
-    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="quick add FX or track template">
+    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="Quick add FX or track template">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
@@ -53,8 +53,10 @@ v1.1 - May 22 2019
   # improved overall script's logic
 v1.2 - May 31 2019
   + ability to apply track templates to selected tracks
-  # moved in-script help to console]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/bf8c9f0724c3212c0fcda15e2adc5454bb3ea94f/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+  # moved in-script help to console
+v1.25 - June 09 2019
+  + added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/1331e689063ff76a81232122889e00cf267039ee/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
     </reapack>
   </category>
