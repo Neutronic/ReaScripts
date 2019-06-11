@@ -1,5 +1,5 @@
 --[[
-Description: quick add FX or track template
+Description: Quick add FX or track template
 About: adds FX or track template{s) to selected track(s)/take(s)
 Version: 1.2
 Author: Neutronic
