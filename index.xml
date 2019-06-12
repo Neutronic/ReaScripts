@@ -32,45 +32,25 @@
         <link rel="donation">https://paypal.me/SIXSTARCOS</link>
       </metadata>
       <version name="1.0" author="Neutronic" time="2019-05-11T17:33:31Z">
-        <changelog><![CDATA[v1.0
+        <changelog><![CDATA[*v1.0
   + initial realease]]></changelog>	  
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/61d082d8e115cebca98f3e6d5e0f9d24aac959f7/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
       <version name="1.01" author="Neutronic" time="2019-05-14T15:15:31Z">
-        <changelog><![CDATA[v1.01
+        <changelog><![CDATA[*v1.01
   + added input_ovrd option to allow users hardcode a search query]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/e258ed63aa732b4087f5688a7e5897d564fe0137/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
       <version name="1.2" author="Neutronic" time="2019-05-31T18:33:50Z">
-        <changelog><![CDATA[v1.00 - May 11 2019
-v1.1 - May 22 2019
-  + 32-bit support
-  + .RfxChain support
-  + exact match search ability using quotes
-  + ability to choose the FX search order
-  + in-script help with complete syntax list
-  # improved overall script's logic
-v1.2 - May 31 2019
+        <changelog><![CDATA[
+*v1.2 - May 31 2019
   + ability to apply track templates to selected tracks
   # moved in-script help to console]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/1331e689063ff76a81232122889e00cf267039ee/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
       <version name="1.25" author="Neutronic" time="2019-06-11T23:15:20Z">
-        <changelog><![CDATA[v1.00 - May 11 2019
-  + initial release
-v1.01 - May 14 2019
-  + added input_ovrd option to allow users hardcode a search query
-v1.1 - May 22 2019
-  + 32-bit support
-  + .RfxChain support
-  + exact match search ability using quotes
-  + ability to choose the FX search order
-  + in-script help with complete syntax list
-  # improved overall script's logic
-v1.2 - May 31 2019
-  + ability to apply track templates to selected tracks
-  # moved in-script help to console
-v1.25 - June 09 2019
+        <changelog><![CDATA[
+*v1.25 - June 09 2019
   + added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/31364243d8f8ff15e486a4e7af7dc95e5efc81ea/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
