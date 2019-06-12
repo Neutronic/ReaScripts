@@ -9,21 +9,21 @@ Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
   Script's forum thread https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  *v1.00 - May 11 2019
+  v1.00 - May 11 2019
     + initial release
-  *v1.01 - May 14 2019
+  v1.01 - May 14 2019
     + added input_ovrd option to allow users hardcode a search query
-  *v1.1 - May 22 2019
+  v1.1 - May 22 2019
     + 32-bit support
     + .RfxChain support
     + exact match search ability using quotes
     + ability to choose the FX search order
     + in-script help with complete syntax list
     # improved overall script's logic
-  *v1.2 - May 31 2019
+  v1.2 - May 31 2019
     + ability to apply track templates to selected tracks
     # moved in-script help to console
-  *v1.25 - June 09 2019
+  v1.25 - June 09 2019
     + added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types
 --]]
 
