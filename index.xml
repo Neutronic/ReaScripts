@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic ReaScripts" commit="3883dc54d710f2539406626fa2e946cce42fb256">
+<index version="1" name="Neutronic Scripts" commit="1706053646e9da870e90edd4bdbf724ba74ad541">
   <category name="Utilities">
     <reapack name="neutronic_MIDI plug and play.lua" type="script" desc="MIDI Plug and Play">
       <metadata>
