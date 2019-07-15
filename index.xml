@@ -19,17 +19,17 @@
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/cbda3193d5c2a067f4f331d99eb12898f9b82519/Utilities/neutronic_MIDI%20plug%20and%20play.lua</source>
       </version>
     </reapack>
-    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="quick add FX or track template">
+    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="Quick add FX or track template">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Adds FX to selected track(s)/take(s) or track template\{s)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Adds FX or track templates to selected tracks or takes.\par}
 }
 ]]></description>
-        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile:</link>
-        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220800">Script's forum thread:</link>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220800">Script's forum thread</link>
         <link rel="donation">https://paypal.me/SIXSTARCOS</link>
       </metadata>
       <version name="1.0" author="Neutronic" time="2019-05-11T17:33:31Z">
