@@ -1,6 +1,6 @@
 --[[
 Description: Quick add FX or track template
-About: adds FX or track template{s) to selected track(s)/take(s)
+About: Adds FX or track templates to selected tracks or takes.
 Version: 1.25
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
