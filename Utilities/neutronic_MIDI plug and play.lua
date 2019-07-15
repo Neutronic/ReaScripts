@@ -4,6 +4,8 @@ Version: 1.0
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 Changelog:
+  v1.00 - May 13 2019
+    + initial release
 Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220867
