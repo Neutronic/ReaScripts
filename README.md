@@ -7,3 +7,5 @@ If you want to import the repository into [ReaPack](https://reapack.com) please 
 `https://raw.githubusercontent.com/Neutronic/ReaScripts/master/index.xml`
 
 For any questions or custom requests feel free to reach me at the [REAPER forum](https://forum.cockos.com/member.php?u=66313).
+
+Thanks!
