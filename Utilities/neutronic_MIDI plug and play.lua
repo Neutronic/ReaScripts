@@ -131,4 +131,4 @@ function else_name()
 end
   
 
-reaper.defer(main)
+main()
