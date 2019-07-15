@@ -15,8 +15,7 @@
         <link rel="donation">https://paypal.me/SIXSTARCOS</link>
       </metadata>
       <version name="1.0" author="Neutronic" time="2019-05-13T18:57:39Z">
-        <changelog><![CDATA[v1.00 - May 13 2019
-  + initial release]]></changelog>
+        <changelog><![CDATA[+ initial release]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/cbda3193d5c2a067f4f331d99eb12898f9b82519/Utilities/neutronic_MIDI%20plug%20and%20play.lua</source>
       </version>
     </reapack>
