@@ -40,7 +40,7 @@
         <changelog><![CDATA[+ added input_ovrd option to allow users hardcode a search query]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/e258ed63aa732b4087f5688a7e5897d564fe0137/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
-	  <version name="1.01" author="Neutronic" time="2019-05-22T12:13:31Z">
+	  <version name="1.1" author="Neutronic" time="2019-05-22T12:13:31Z">
         <changelog><![CDATA[+ 32-bit support
   + .RfxChain support
   + exact match search ability using quotes
