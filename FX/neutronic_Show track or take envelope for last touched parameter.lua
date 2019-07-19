@@ -1,6 +1,6 @@
 --[[
 Description: Show track or take envelope for last touched parameter
-About: Adds tracks / takes envelopes for the last touched FX parameter
+About: Adds tracks or takes envelopes for the last touched FX parameter.
 Version: 1.0
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
