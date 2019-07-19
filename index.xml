@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="893b941533ca6fd6e951da142a901f8c9ad7ae53">
+<index version="1" name="Neutronic Scripts" commit="c61939c344bd2c26abeb04e22c47578a434ba46c">
+  <category name="FX">
+    <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Adds tracks / takes envelopes for the last touched FX parameter\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile:</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2019-07-19T00:04:37Z">
+        <changelog><![CDATA[v1.00 - July 19 2019
+  + initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/c61939c344bd2c26abeb04e22c47578a434ba46c/FX/neutronic_Show%20track%20or%20take%20envelope%20for%20last%20touched%20parameter.lua</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Utilities">
     <reapack name="neutronic_MIDI plug and play.lua" type="script" desc="MIDI Plug and Play">
       <metadata>
