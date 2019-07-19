@@ -8,7 +8,6 @@ License: GNU GPL v3
 Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
 Changelog:
-  v1.00 - July 19 2019
     + initial release
 --]]
 
