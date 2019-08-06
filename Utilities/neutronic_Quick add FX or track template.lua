@@ -1,34 +1,25 @@
 --[[
-Description: Quick add FX or track template
-About: Adds FX or track templates to selected tracks or takes.
-Version: 1.25
+Description: quick add FX or track template
+About: adds FX or track template{s) to selected track(s)/take(s)
+Version: 1.30
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
-  Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
-  Script's forum thread https://forum.cockos.com/showthread.php?t=220800
+  Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
+  Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  v1.00 - May 11 2019
-    + initial release
-  v1.01 - May 14 2019
-    + added input_ovrd option to allow users hardcode a search query
-  v1.1 - May 22 2019
-    + 32-bit support
-    + .RfxChain support
-    + exact match search ability using quotes
-    + ability to choose the FX search order
-    + in-script help with complete syntax list
-    # improved overall script's logic
-  v1.2 - May 31 2019
-    + ability to apply track templates to selected tracks
-    # moved in-script help to console
-  v1.25 - June 09 2019
-    + added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types
+  + AU format support
+  + video processor support
+  + option to reverse the /a flag behavior
+  + option to preserve layouts when applying track templates
+  + safeguard against false JS files
+  # improved JS instances naming in FX chains
 --]]
 
 --require("dev")
 function console() end
+local cur_os = reaper.GetOS()
 
 ---------- USER DEFINABLES ----------
 
@@ -37,16 +28,19 @@ local fx_a = "VST2"
 local fx_b = "VST3"
 local fx_c = "JS"
 local fx_d = "CHAIN"
-local fx_type = {fx_d, fx_a, fx_b, fx_c} -- the search order of FX types. Can be reordered
+local fx_e = "AU"
+local fx_type = {fx_d, fx_e, fx_a, fx_b, fx_c} -- the search order of FX types. Can be reordered
 
 ----- change the values below to true to activate the options or false to disable
 
 local search_track_name = false -- silently feed track names to the script
+local a_flag_reverse = false -- set it to "true" to reverse the behavior of the /a flag
 
 local keep_states = { -- what original track info to preserve when applying track templates
 GROUP_FLAGS = true, -- track group membership
 ISBUS = true, -- folder states (affects only templates containing a single track)
 ITEMS = true, -- track items
+LAYOUTS = true, -- track TCP + MCP layouts
 MAINSEND = true, -- master send / parent channels
 MUTESOLO = false, -- mute / solo
 REC = true, -- track record arm status / input / monitoring
@@ -62,17 +56,19 @@ local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
 local name, name_parts, part_match, l, input, undo_name, t_or_t, retval, data, js_name, v_s, dest,
-      dest_count, fx_ch_list, fx_i, plugs, vst, sel_tr, track_1_sub, content, tracks
+      dest_count, fx_ch_list, fx_i, plugs, vst, au, sel_tr, track_1_sub, content, tracks
 local r_path = reaper.GetResourcePath()
 local dir_list = {}
 local file_list = {}
 local plugs_rel = {}
 local exact = ""
-local OS = package.config:sub(1,1)
 local bit_vers = reaper.GetAppVersion():gsub(".+/", "")
 
 if bit_vers:gsub("%D", "") == "64" then
   vst = r_path .. "/reaper-vstplugins64.ini"
+  if cur_os == "OSX64" then
+    au = r_path .. "/reaper-auplugins64.ini"
+  end
 else
   vst = r_path .. "/reaper-vstplugins.ini"
 end
@@ -267,6 +263,9 @@ end
 function plugs_rel_parse(v)
   if v.fx_type == "JS" then -- if JS
     name = v[1]:match(".+||"):gsub("|", "")
+    if name ~= "Video processor" then
+      name = v.fx_type..":"..v[1]:match(".+||"):gsub("|", "")
+    end
     undo_name = v[1]:gsub(".+||", ""):gsub(" %(.+%)", "")
   elseif v.fx_type == "CHAIN" then
     name = [[]] .. v[1][2]:gsub(r_path .. "/FXChains/", "") .. v[1][1] .. [[]] .. ".RfxChain"
@@ -382,32 +381,47 @@ function track_wait()
 end
 
 function match()
-  plugs = {VST2 = {}, VST3 = {}, JS = {}}
+  plugs = {VST2 = {}, VST3 = {}, JS = {}, AU = {}}
   
   match_vst()  
   
   match_js()
   
+  if cur_os == "OSX64" then
+    match_au()
+  end
+  
   for i, v in ipairs(name_parts) do
-    if v:upper() == fx_type[1] then
-      gen_name(fx_type[1])
-      break
-    elseif v:upper() == fx_type[2] then
-      gen_name(fx_type[2])
-      break
-    elseif v:upper() == fx_type[3] then
-      gen_name(fx_type[3])
-      break
-    elseif v:upper() == fx_type[4] then
-      gen_name(fx_type[4])
-      break
-    elseif i == #name_parts then
-      for i = 1, #fx_type do
-        gen_name(fx_type[i])
+    for m = 1, #fx_type do
+      if v:upper() == fx_type[m] then
+        if cur_os ~= "OSX64" then
+          if fx_type[m] ~= "AU" then
+            gen_name(fx_type[m])
+            goto BREAK
+            break
+          end
+        else
+          gen_name(fx_type[m])
+          goto BREAK
+          break
+        end
+      end
+    end
+    if stop then stop = nil break end
+    if i == #name_parts then
+      for m = 1, #fx_type do
+        if cur_os ~= "OSX64" then
+          if fx_type[m] ~= "AU" then
+            gen_name(fx_type[m])
+          end
+        else
+          gen_name(fx_type[m])
+        end
         if name then break end
       end
     end
   end
+  ::BREAK::
 end
 
 function match_vst()
@@ -431,8 +445,20 @@ function match_js()
     for l in file:lines() do
        if l:find("desc:") then js_name = l:gsub("desc:", "") break end
     end
-    file:close() 
-    table.insert(plugs.JS, file_list[i][1] .. "||" .. js_name)
+    file:close()
+    if js_name then
+      table.insert(plugs.JS, file_list[i][1] .. "||" .. js_name)
+    end
+  end
+  table.insert(plugs.JS, "Video processor" .. "||" .. "Video processor")
+end
+
+function match_au()
+  for line in io.lines(au) do
+    if line:match("^(.+)=.+$") then
+      local au_name = line:match("^(.+)=.+$")
+      table.insert(plugs.AU, au_name)
+    end
   end
 end
 
@@ -451,6 +477,7 @@ function gen_name(fx_type)
       if name_parts[m]:match("^/") or
       name_parts[m]:upper():match("VST%d") or
       name_parts[m]:upper():match("JS") or
+      name_parts[m]:upper():match("AU") or
       name_parts[m]:upper():match("CHAIN") then goto PART_SKIP end -- if flag or fx type then skip
       if type(v) == "table" then l = v[1] else l = v end
       exclude = string.match(name_parts[m], "^%%%-.+")
@@ -535,12 +562,11 @@ function list_dir(match, ext)
             file = file:gsub("%." .. ext, "")
             table.insert(file_list, {file, [[]] .. r_path .. dir_list[i] .. [[]] .. "/"})
           elseif file:match("^.+jsfx$") or not file:match("%.") then -- if JS
-            local dir = dir_list[i]:gsub("/" .. match, "")
+            local dir = dir_list[i]:gsub("/" .. match, ""):gsub("^/", "")
             if dir ~= "" then
-              table.insert(file_list, {dir .. "/" .. file, [[]] .. r_path .. dir_list[i] .. [[]] .. "/"})
-            else
-              table.insert(file_list, {file, [[]] .. r_path .. dir_list[i] .. [[]] .. "/"})  
+              dir = dir .. "/"
             end
+            table.insert(file_list, {dir .. file, [[]] .. r_path .. dir_list[i] .. [[]] .. "/"})
           end
           m = m + 1
         end
@@ -568,7 +594,7 @@ function add_tr_temp(v)
   local track_template = [[]] .. v[2] .. v[1] .. [[]] .. ".RTrackTemplate"
   
   reaper.Undo_BeginBlock()
-  if apply then
+  if apply and not a_flag_reverse or not apply and a_flag_reverse then
     apply_template(track_template)
   else
       local t_temp = {}
@@ -627,12 +653,11 @@ function match_exact(word)
 end
 
 function url_open(url)
-  local os = reaper.GetOS()
-  if os == "Win32" or os == "Win64" then
+  if cur_os == "Win32" or cur_os == "Win64" then
     reaper.ExecProcess('cmd.exe /C start "" "' .. url .. '"', 0)
-  elseif os == "OSX32" or os == "OSX64" then
+  elseif cur_os == "OSX32" or cur_os == "OSX64" then
     os.execute('open "" "' .. url .. '"')
-  elseif os == "Other" then
+  elseif cur_os == "Other" then
     os.execute('xdg-open "" "' .. url .. '"')    
   end
 end
@@ -674,6 +699,8 @@ function fx_type_sh()
       name_parts[1] = fx_c
     elseif name_parts[1]:match("^c$") then
       name_parts[1] = fx_d
+    elseif cur_os == "OSX64" and name_parts[1]:match("^a$") then
+      name_parts[1] = fx_e
     end
   end
 end
