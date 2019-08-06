@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="b248e7ba435ffb7de89212ff338efd18662f10fb">
+<index version="1" name="Neutronic Scripts" commit="8ae886c20c56d0ee69c2218e69762d75e3396ad8">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -38,17 +38,17 @@
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/cbda3193d5c2a067f4f331d99eb12898f9b82519/Utilities/neutronic_MIDI%20plug%20and%20play.lua</source>
       </version>
     </reapack>
-    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="Quick add FX or track template">
+    <reapack name="neutronic_Quick add FX or track template.lua" type="script" desc="quick add FX or track template">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Adds FX or track templates to selected tracks or takes.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 adds FX or track template\{s) to selected track(s)/take(s)\par}
 }
 ]]></description>
-        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
-        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220800">Script's forum thread</link>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile:</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=220800">Script's forum thread:</link>
         <link rel="donation">https://paypal.me/SIXSTARCOS</link>
       </metadata>
       <version name="1.0" author="Neutronic" time="2019-05-11T17:33:31Z">
@@ -67,6 +67,15 @@
       <version name="1.25" author="Neutronic" time="2019-06-11T23:15:20Z">
         <changelog><![CDATA[+ added "2", "3", "j" and "c" as shorthands for vst2/vst3/js/chain fx types]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/893b941533ca6fd6e951da142a901f8c9ad7ae53/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+      </version>
+      <version name="1.30" author="Neutronic" time="2019-08-06T06:09:59Z">
+        <changelog><![CDATA[+ AU format support
++ video processor support
++ option to reverse the /a flag behavior
++ option to preserve layouts when applying track templates
++ safeguard against false JS files
+# improved JS instances naming in FX chains]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/8ae886c20c56d0ee69c2218e69762d75e3396ad8/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
     </reapack>
   </category>
