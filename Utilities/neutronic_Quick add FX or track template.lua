@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: Adds FX or track templates to selected tracks or takes.
-Version: 1.30
+Version: 1.31
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -9,12 +9,7 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  + AU format support
-  + video processor support
-  + option to reverse the /a flag behavior
-  + option to preserve layouts when applying track templates
-  + safeguard against false JS files
-  # improved JS instances naming in FX chains
+  #improve FX listing logic
 --]]
 
 --require("dev")
@@ -426,12 +421,12 @@ end
 
 function match_vst()
   for line in io.lines(vst) do
-    if line:find("%(") then
-      if line:lower():find("vst3") then
-        local vst_name = line:gsub(".+%d%d%d%d%d,", "")--:gsub("!.+", "")
+    if line:match("^.-=.-,.-,.+$") then
+    console(line,1)
+      local vst_name = line:match("^.-=.-,.-,(.+)$")
+      if line:lower():match("vst3") then
         table.insert(plugs.VST3, vst_name)
       else
-        local vst_name = line:gsub(".+%d%d%d%d%d,", "")--:gsub("!.+", "")
         table.insert(plugs.VST2, vst_name)
       end
     end
@@ -455,8 +450,8 @@ end
 
 function match_au()
   for line in io.lines(au) do
-    if line:match("^(.+)=.+$") then
-      local au_name = line:match("^(.+)=.+$")
+    if line:match("^.-=.+$") then
+      local au_name = line:match("^(.-)=.+$")
       table.insert(plugs.AU, au_name)
     end
   end
