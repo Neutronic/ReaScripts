@@ -9,7 +9,7 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  #improve FX listing logic
+  # improved FX listing logic
 --]]
 
 --require("dev")
