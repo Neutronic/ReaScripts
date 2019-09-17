@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: Adds FX or track templates to selected tracks or takes.
-Version: 1.31
+Version: 1.40
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -9,7 +9,9 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  # improved FX listing logic
+  + start a search query with a whitespace to clear relevant FX chains before adding FX
+  + ignore plugins that begin with #
+  # show FX chain when adding it (instead of floating last FX in chain)
 --]]
 
 --require("dev")
@@ -51,7 +53,7 @@ local sel_it_count = reaper.CountSelectedMediaItems()
 local m_track = reaper.GetMasterTrack()
 local is_m_sel = reaper.IsTrackSelected(m_track)
 local name, name_parts, part_match, l, input, undo_name, t_or_t, retval, data, js_name, v_s, dest,
-      dest_count, fx_ch_list, fx_i, plugs, vst, au, sel_tr, track_1_sub, content, tracks
+      dest_count, fx_ch_list, fx_i, plugs, vst, au, sel_tr, track_1_sub, content, tracks, clear_fx
 local r_path = reaper.GetResourcePath()
 local dir_list = {}
 local file_list = {}
@@ -126,20 +128,34 @@ function add_track_fx()
   end
 end
 
-function flush_fx(tr, i)
-  local fx_count = reaper.TrackFX_GetCount(tr)
-  for m = 0, fx_count do
-    reaper.TrackFX_SetOffline(tr, i, true)
-  end
-  for m = 0, fx_count do
-    reaper.TrackFX_Delete(tr, 0)
+function flush_fx(object, kind)
+  if kind < 3 then -- if not take FX
+    if kind < 2 then -- if not track input FX
+      local fx_count = reaper.TrackFX_GetCount(object)
+      for i = 0, fx_count do
+        reaper.TrackFX_SetOffline(object, 0, true)
+        reaper.TrackFX_Delete(object, 0)
+      end
+    else -- if track input FX
+      local fx_count = reaper.TrackFX_GetRecCount(object)
+      for i = 0, fx_count do
+        reaper.TrackFX_SetOffline(object, 0x1000000+0, true)
+        reaper.TrackFX_Delete(object, 0x1000000+0)
+      end
+    end
+  else -- if take FX
+    local fx_count = reaper.TakeFX_GetCount(object)
+    for i = 0, fx_count do
+      reaper.TakeFX_SetOffline(object, 0, true)
+      reaper.TakeFX_Delete(object, 0)
+    end
   end
 end
 
 function template_single(i)
   track_1_sub = tracks[1]
   local tr = reaper.GetSelectedTrack(0, i)
-  flush_fx(tr, i)
+  flush_fx(tr, 1)
   for k, v in pairs(sel_tr[i+1]["states"]) do -- recall states
     if tracks[1]:match(k) then
       track_1_sub = track_1_sub:gsub(k..".-\n", v, 1)
@@ -277,6 +293,13 @@ function track_fx()
     local track = reaper.GetSelectedTrack(0, i)
     for i, v in ipairs(plugs_rel) do
       plugs_rel_parse(v)
+      if clear_fx == true then
+        if dest ~= "/i" then
+          flush_fx(track, 1)
+        else
+          flush_fx(track, 2)
+        end
+      end
       fx_i = reaper.TrackFX_AddByName(track, name, input, -1)
       if fx_i >= 0 then break end
     end
@@ -287,9 +310,17 @@ function track_fx()
     end
     if i == 0 then
       if dest == "/i" then -- if input FX
-        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
+        if not name:match("%.RfxChain") then -- if not chain
+          reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
+        else
+          reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 1)
+        end
       else
-        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 3)
+        if not name:match("%.RfxChain") then -- if not chain
+          reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 3)
+        else
+          reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 1)
+        end
       end
     end
   end
@@ -328,6 +359,9 @@ function add_item_fx()
         local take = reaper.GetActiveTake(item)
         for i, v in ipairs(plugs_rel) do
           plugs_rel_parse(v)
+          if clear_fx == true then
+            flush_fx(take, 3)
+          end
           fx_i = reaper.TakeFX_AddByName(take, name, -1)
           if fx_i >= 0 then break end
         end
@@ -337,7 +371,11 @@ function add_item_fx()
           return
         end
         if i == 0 then
-          reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 3)
+          if not name:match("%.RfxChain") then -- if not chain
+            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 3)
+          else
+            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 1)
+          end
         end
       end
       if sel_it_count > 1 then
@@ -424,10 +462,12 @@ function match_vst()
     if line:match("^.-=.-,.-,.+$") then
     console(line,1)
       local vst_name = line:match("^.-=.-,.-,(.+)$")
-      if line:lower():match("vst3") then
-        table.insert(plugs.VST3, vst_name)
-      else
-        table.insert(plugs.VST2, vst_name)
+      if not vst_name:match("^#") then
+        if line:lower():match("vst3") then
+          table.insert(plugs.VST3, vst_name)
+        else
+          table.insert(plugs.VST2, vst_name)
+        end
       end
     end
   end
@@ -452,7 +492,9 @@ function match_au()
   for line in io.lines(au) do
     if line:match("^.-=.+$") then
       local au_name = line:match("^(.-)=.+$")
-      table.insert(plugs.AU, au_name)
+      if not au_name:match("^#") then
+        table.insert(plugs.AU, au_name)
+      end
     end
   end
 end
@@ -470,10 +512,11 @@ function gen_name(fx_type)
     for m = 1, #name_parts do
       --
       if name_parts[m]:match("^/") or
-      name_parts[m]:upper():match("VST%d") or
-      name_parts[m]:upper():match("JS") or
-      name_parts[m]:upper():match("AU") or
-      name_parts[m]:upper():match("CHAIN") then goto PART_SKIP end -- if flag or fx type then skip
+      name_parts[m]:upper():match("^VST%d$") or
+      name_parts[m]:upper():match("^JS$") or
+      name_parts[m]:upper():match("^CHAIN$") then goto PART_SKIP end -- if flag or fx type then skip
+      if name_parts[m]:upper():match("^AU$") and
+      cur_os == "OSX64" then goto PART_SKIP end -- if AU and macOS thenk skip
       if type(v) == "table" then l = v[1] else l = v end
       exclude = string.match(name_parts[m], "^%%%-.+")
       --
@@ -667,11 +710,13 @@ function stop_str(str)
 end
 
 function help()
+  reaper.ClearConsole()
   reaper.ShowConsoleMsg("You can use the script to add track FX, input FX, take FX, FX chains"..
-            " and track templates. The script supports both full words and partial keywords.\n\n"..
+            " and track templates.\n\nThe script supports both full words and partial keywords.\n\n"..
             "When adding FX you can use:\n/i flag to add input track FX (e.g. gate /i);\n" ..
             "/t flag for take FX (e.q. EQ /t);\n"..
-            "2/3/j/c as the first keyword to force vst2/vst3/js/chain type (e.g. 3 pro-q).\n\n"..
+            "2/3/a/j/c as the first keyword to force VST2/VST3/AU/JS/Chain type (e.g. 3 pro-q);\n"..
+            "whitespace before keywords to clear relevant FX chains prior to adding FX.\n\n" ..
             "Track templates specifics:\n"..
             "to add a track template use . prefix with the first word (eg .soft piano);\n"..
             "/n flag to add multiple instances of a template (eg .bgv /4);\n"..
@@ -712,7 +757,8 @@ function main()
     local tr_name = select(2, reaper.GetTrackName(tr))
     data = "."..tr_name.." /a"
   elseif search_track_name == false and input_ovrd == "" then
-    retval, data = reaper.GetUserInputs("Quick Add FX or Track Template", 1, "FX or track template ('?' for help):,extrawidth=88", "")
+    retval, data = reaper.GetUserInputs("Quick Add FX or Track Template", 1,
+                   "FX or track template ('?' for help):,extrawidth=88", "")
   elseif input_ovrd ~= "" then
     data = input_ovrd
   else
@@ -723,6 +769,9 @@ function main()
   if retval or input_ovrd ~= "" or search_track_name then
     name_parts = {}
     local i = 0
+    if data:match("^%s.+$") then
+      clear_fx = true
+    end
     for word in data:gmatch("[%w%p]+") do
       i = i + 1
       word = word:lower()
@@ -747,25 +796,12 @@ function main()
       name_parts = temp_parts
       temp_parts = nil
     end
-    
-    --[[
-    This part allows putting period before any keyword to insert a track template
-    for i, v in ipairs(name_parts) do
-      if v:match("^%%%.") and i > 1 then
-      bla = i
-        name_parts[#name_parts+1] = name_parts[1]
-        name_parts[1] = v
-        name_parts[i] = name_parts[#name_parts]
-        name_parts[#name_parts] = nil
-        break
-      end
-    end]]
-    
-    if #name_parts == 1 and stop_str(name_parts[1]) then
+     
+    if #name_parts == 0 or #name_parts == 1 and stop_str(name_parts[1]) then
       return
-    elseif name_parts[1]:match("^%%%$$") and #name_parts == 1 then -- donate
+    elseif #name_parts == 1 and name_parts[1]:match("^%%%$$") then -- donate
       url_open("https://paypal.me/SIXSTARCOS")
-    elseif name_parts[1]:match("^%%%?$") and #name_parts == 1 then
+    elseif #name_parts == 1 and name_parts[1]:match("^%%%?$") then
       help()
     elseif name_parts[1]:match("^%%%.") or name_parts[1]:match("^\"%%%.") then -- if template
       list_dir("TrackTemplates", "RTrackTemplate")
