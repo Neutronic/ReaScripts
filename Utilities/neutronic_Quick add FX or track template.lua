@@ -212,7 +212,7 @@ function apply_template(template)
   until not track
   table.insert(tracks, content)
   
-  if content == "" or sel_tr_count == 0 then bla = 1 close_undo() return end  
+  if content == "" or sel_tr_count == 0 then close_undo() return end  
   
   if not search_track_name then
     first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
@@ -516,7 +516,7 @@ function gen_name(fx_type)
       name_parts[m]:upper():match("^JS$") or
       name_parts[m]:upper():match("^CHAIN$") then goto PART_SKIP end -- if flag or fx type then skip
       if name_parts[m]:upper():match("^AU$") and
-      cur_os == "OSX64" then goto PART_SKIP end -- if AU and macOS thenk skip
+      cur_os == "OSX64" then goto PART_SKIP end -- if AU and macOS then skip
       if type(v) == "table" then l = v[1] else l = v end
       exclude = string.match(name_parts[m], "^%%%-.+")
       --
@@ -616,14 +616,14 @@ end
 function add_tr_temp(v)
   local template_inst, apply, tt_mode, name
   for i, a in ipairs(name_parts) do -- check for TT number flag
-    if a:match("/%d+") then
+    if a:match("^/%d+$") then
       template_inst = a:match("%d+")
       break
     end
   end
   
   for i, a in ipairs(name_parts) do -- check for apply flag
-    if a:match("/a") then
+    if a:match("^/a$") then
       apply = true
       break
     end
@@ -716,7 +716,7 @@ function help()
             "When adding FX you can use:\n/i flag to add input track FX (e.g. gate /i);\n" ..
             "/t flag for take FX (e.q. EQ /t);\n"..
             "2/3/a/j/c as the first keyword to force VST2/VST3/AU/JS/Chain type (e.g. 3 pro-q);\n"..
-            "whitespace before keywords to clear relevant FX chains prior to adding FX.\n\n" ..
+            "a whitespace character before keywords to clear relevant FX chains prior to adding FX.\n\n" ..
             "Track templates specifics:\n"..
             "to add a track template use . prefix with the first word (eg .soft piano);\n"..
             "/n flag to add multiple instances of a template (eg .bgv /4);\n"..
