@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: Adds FX or track templates to selected tracks or takes.
-Version: 1.40
+Version: 1.45
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -9,9 +9,8 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  + start a search query with a whitespace to clear relevant FX chains before adding FX
-  + ignore plugins that begin with #
-  # show FX chain when adding it (instead of floating last FX in chain)
+  #insert track templates after the last selected track or at the end of the track list
+  #respect folder level if the last selected track is also the last track in folder
 --]]
 
 --require("dev")
@@ -613,6 +612,42 @@ function list_dir(match, ext)
   end
 end
 
+function inFolderPrepare()
+  local f_depth, tr
+  if reaper.CountTracks(0) > 0 then
+    if sel_tr_count > 0 then
+      tr = reaper.GetSelectedTrack(0, sel_tr_count - 1)
+      f_depth = reaper.GetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH") 
+      if f_depth < 0 then
+        reaper.SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", 0)
+      end
+    else
+      tr = reaper.GetTrack(0, reaper.CountTracks(0) - 1)
+    end
+    reaper.SetOnlyTrackSelected(tr)
+    reaper.Main_OnCommand(40914, 0)
+  end
+  return f_depth
+end
+
+function inFolderSet(f_depth, option)
+  if option == 0 then
+    if f_depth and f_depth < 0 then
+      local tr = reaper.GetSelectedTrack(0, reaper.CountSelectedTracks(0) - 1)
+      reaper.SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", f_depth)
+    end
+  elseif option == 1 then
+    if f_depth and f_depth < 0 then
+      local tr = reaper.GetSelectedTrack(0, reaper.CountSelectedTracks(0) - 1)
+      local f_depth2 = reaper.GetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH")
+      if f_depth2 < 0 then
+        f_depth = f_depth + f_depth2
+      end
+      reaper.SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", f_depth)
+    end
+  end
+end
+
 function add_tr_temp(v)
   local template_inst, apply, tt_mode, name
   for i, a in ipairs(name_parts) do -- check for TT number flag
@@ -635,18 +670,23 @@ function add_tr_temp(v)
   if apply and not a_flag_reverse or not apply and a_flag_reverse then
     apply_template(track_template)
   else
-      local t_temp = {}
-      if template_inst then
-        for i = 1, template_inst do
-          reaper.Main_openProject(track_template)
-          table.insert(t_temp, reaper.GetSelectedTrack(0, 0))
-        end
-        for i = 1, #t_temp do
-          reaper.SetTrackSelected(t_temp[i], 1)
-        end    
-      else
+    local t_temp = {}
+    reaper.PreventUIRefresh(1)
+    local f_depth = inFolderPrepare()
+    if template_inst then
+      for i = 1, template_inst do
         reaper.Main_openProject(track_template)
-      end      
+        table.insert(t_temp, reaper.GetSelectedTrack(0, 0))
+      end
+      for i = 1, #t_temp do
+        reaper.SetTrackSelected(t_temp[i], 1)
+      end
+      inFolderSet(f_depth, 0)
+    else
+      reaper.Main_openProject(track_template)
+      inFolderSet(f_depth, 1)
+    end
+    reaper.PreventUIRefresh(-1)
   end
   
   if apply or search_track_name then
