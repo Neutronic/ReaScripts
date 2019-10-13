@@ -9,8 +9,8 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  #insert track templates after the last selected track or at the end of the track list
-  #respect folder level if the last selected track is also the last track in folder
+  # insert track templates after the last selected track or at the end of the track list
+  # respect folder level if the last selected track is also the last track in folder
 --]]
 
 --require("dev")
