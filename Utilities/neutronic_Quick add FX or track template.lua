@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: Adds FX or track templates to selected tracks or takes.
-Version: 1.45
+Version: 1.47
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -9,8 +9,7 @@ Links:
   Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
   Script's forum thread: https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  # insert track templates after the last selected track or at the end of the track list
-  # respect folder depth level if the last selected track is also the last track in folder
+  + option to keep the track name when applying a track template (off by default)
 --]]
 
 --require("dev")
@@ -39,6 +38,7 @@ ITEMS = true, -- track items
 LAYOUTS = true, -- track TCP + MCP layouts
 MAINSEND = true, -- master send / parent channels
 MUTESOLO = false, -- mute / solo
+NAME = false, -- track name
 REC = true, -- track record arm status / input / monitoring
 TRACKHEIGHT = true, -- track height
 VOLPAN = false -- volume / pan
@@ -459,7 +459,6 @@ end
 function match_vst()
   for line in io.lines(vst) do
     if line:match("^.-=.-,.-,.+$") then
-    console(line,1)
       local vst_name = line:match("^.-=.-,.-,(.+)$")
       if not vst_name:match("^#") then
         if line:lower():match("vst3") then
