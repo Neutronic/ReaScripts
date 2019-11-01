@@ -6,7 +6,7 @@ Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
-  Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
+  Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
 Changelog:
     + initial release
 --]]
