@@ -7,8 +7,8 @@ Changelog:
   v1.00 - May 13 2019
     + initial release
 Links:
-  Neutronic's REAPER forum profile: https://forum.cockos.com/member.php?u=66313
-  Script's forum thread: https://forum.cockos.com/showthread.php?t=220867
+  Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
+  Script's forum thread https://forum.cockos.com/showthread.php?t=220867
 About: 
   It's a background script that provides automatic MIDI controller initialization for REAPER.
 --]]
