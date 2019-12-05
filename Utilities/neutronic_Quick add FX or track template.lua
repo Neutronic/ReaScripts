@@ -9,7 +9,7 @@ Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
   Script's forum thread https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  + option to clear the master track FX chain before adding FX
+  + option to clear master track FX chain before adding FX
   # open plugins inside FX Chains if chains are visible
 --]]
 
