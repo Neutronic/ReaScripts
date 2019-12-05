@@ -292,7 +292,7 @@ function fxTrack_Float(track)
   if input then -- if input FX
     if not name:match("%.RfxChain") then -- if not chain
       local chunk = select(2, reaper.GetTrackStateChunk(track, "", false))
-      local is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.+SHOW (%d+)"))
+      local is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.-SHOW (%d+)"))
       if not is_fxc_vis or is_fxc_vis == 0 then -- if FX chain is hidden
         reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
       else
