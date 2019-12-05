@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="075357353fee3e35d510f552bf340dacb2204d3a">
+<index version="1" name="Neutronic Scripts" commit="0179247525bba5d57f7cd3494c2f4b95a28789a5">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -96,6 +96,11 @@
       <version name="1.47" author="Neutronic" time="2019-10-31T23:39:25Z">
         <changelog><![CDATA[+ option to keep the track name when applying a track template (off by default)]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/8da5e1b2631566dc8fc17d7172e8322bfae982de/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
+      </version>
+      <version name="1.50" author="Neutronic" time="2019-12-05T13:28:36Z">
+        <changelog><![CDATA[+ option to clear the master track FX chain before adding FX
+# open plugins inside FX Chains if chains are visible]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/617dd127dc5e5d5d313fdefdac4805c3e1188079/Utilities/neutronic_Quick%20add%20FX%20or%20track%20template.lua</source>
       </version>
     </reapack>
   </category>
