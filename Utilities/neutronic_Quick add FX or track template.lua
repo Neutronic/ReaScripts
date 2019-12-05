@@ -1,7 +1,7 @@
 --[[
 Description: Quick add FX or track template
 About: Adds FX or track templates to selected tracks or takes.
-Version: 1.47
+Version: 1.50
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -9,7 +9,8 @@ Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
   Script's forum thread https://forum.cockos.com/showthread.php?t=220800
 Changelog:
-  + option to keep the track name when applying a track template (off by default)
+  + option to clear the master track FX chain before adding FX
+  # open plugins inside FX Chains if chains are visible
 --]]
 
 --require("dev")
@@ -287,6 +288,33 @@ function plugs_rel_parse(v)
   console("Plug-in name: " .. name .. "\nPlug-in undo name: " .. undo_name, 1)
 end
 
+function fxTrack_Float(track)
+  if input then -- if input FX
+    if not name:match("%.RfxChain") then -- if not chain
+      local chunk = select(2, reaper.GetTrackStateChunk(track, "", false))
+      local is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.+SHOW (%d+)"))
+      if not is_fxc_vis or is_fxc_vis == 0 then -- if FX chain is hidden
+        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
+      else
+        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 2)
+      end
+    else
+      reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 1)
+    end
+  else
+    if not name:match("%.RfxChain") then -- if not chain
+      local is_fxc_vis = reaper.TrackFX_GetChainVisible(track)
+      if is_fxc_vis == -1 then -- if FX chain is hidden
+        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 3)
+      else
+        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 2)
+      end
+    else
+      reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 1)
+    end
+  end
+end
+
 function track_fx()
   for i = 0, sel_tr_count - 1 do
     local track = reaper.GetSelectedTrack(0, i)
@@ -308,19 +336,7 @@ function track_fx()
       break
     end
     if i == 0 then
-      if dest == "/i" then -- if input FX
-        if not name:match("%.RfxChain") then -- if not chain
-          reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
-        else
-          reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 1)
-        end
-      else
-        if not name:match("%.RfxChain") then -- if not chain
-          reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 3)
-        else
-          reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 1)
-        end
-      end
+      fxTrack_Float(track)
     end
   end
 end
@@ -329,6 +345,13 @@ function master_fx()
   if is_m_sel then -- if master track is selected
     for i, v in ipairs(plugs_rel) do
       plugs_rel_parse(v)
+      if clear_fx == true then
+        if dest ~= "/i" then
+          flush_fx(m_track, 1)
+        else
+          flush_fx(m_track, 2)
+        end
+      end
       fx_i = reaper.TrackFX_AddByName(m_track, name, input, -1)
       if fx_i >= 0 then break end
     end
@@ -337,7 +360,7 @@ function master_fx()
       close_undo()
     end
     if sel_tr_count == 0 then -- if no other tracks are selected then float the master FX
-      reaper.TrackFX_Show(m_track, reaper.TrackFX_GetCount(m_track)-1, 3)
+      fxTrack_Float(m_track)
     end
   end
 end
