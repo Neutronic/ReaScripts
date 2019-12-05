@@ -394,7 +394,12 @@ function add_item_fx()
         end
         if i == 0 then
           if not name:match("%.RfxChain") then -- if not chain
-            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 3)
+            local is_fxc_vis = reaper.TakeFX_GetChainVisible(take)
+            if is_fxc_vis == -1 then -- if FX chain is hidden
+              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 3)
+            else
+              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 2)
+            end
           else
             reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 1)
           end
