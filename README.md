@@ -6,6 +6,7 @@ Everything you find here is *free* but [donations](https://www.paypal.me/SIXSTAR
 If you want to import the repository into [ReaPack](https://reapack.com) please paste the following link when prompted:
 `https://github.com/Neutronic/ReaScripts/raw/master/index.xml`
 
-For any questions or custom requests feel free to reach me at the [REAPER forum](https://forum.cockos.com/member.php?u=66313).
+For questions and custom scripting inquiries feel free to reach me at the [REAPER forum](https://forum.cockos.com/member.php?u=66313).
 
-Thanks!
+Best,
+Dmitri
