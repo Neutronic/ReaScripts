@@ -8,5 +8,5 @@ If you want to import the repository into [ReaPack](https://reapack.com) please 
 
 For questions and custom scripting inquiries feel free to reach me at the [REAPER forum](https://forum.cockos.com/member.php?u=66313).
 
-Best,
+Best,  
 Dmitri
