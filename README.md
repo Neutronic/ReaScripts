@@ -1,7 +1,7 @@
 # [ReaScripts](https://www.reaper.fm/sdk/reascript/reascript.php) by Neutronic
 This repository contains my public scripts made for [REAPER](https://www.reaper.fm).
 
-Everything you find here is *free* but [donations](https://www.paypal.me/SIXSTARCOS) are very much appreciated.
+Everything you find here is *free* but [donations](https://www.paypal.me/SIXSTARCOS) are very much welcome and appreciated.
 
 If you want to import the repository into [ReaPack](https://reapack.com) please paste the following link when prompted:
 `https://github.com/Neutronic/ReaScripts/raw/master/index.xml`
