@@ -113,20 +113,23 @@
 ReaScripts
 }}}
  by Neutronic\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 This repository contains my public scripts made for REAPER.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This repository contains my public scripts made for {\field{\*\fldinst{HYPERLINK "https://www.reaper.fm"}}{\fldrslt{\ul
+REAPER
+}}}
+.\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 Everything you find here is {\i free} but {\field{\*\fldinst{HYPERLINK "https://www.paypal.me/SIXSTARCOS"}}{\fldrslt{\ul
 donations
 }}}
- are very much appreciated.\par}
+ are very much welcome and appreciated.\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 If you want to import the repository into {\field{\*\fldinst{HYPERLINK "https://reapack.com"}}{\fldrslt{\ul
 ReaPack
 }}}
  please paste the following link when prompted: {\f1 https://github.com/Neutronic/ReaScripts/raw/master/index.xml}\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 For any questions or custom requests feel free to reach me at the {\field{\*\fldinst{HYPERLINK "https://forum.cockos.com/member.php?u=66313"}}{\fldrslt{\ul
+{\pard \ql \f0 \sa180 \li0 \fi0 For questions and scripting inquiries feel free to reach me at the {\field{\*\fldinst{HYPERLINK "https://forum.cockos.com/member.php?u=66313"}}{\fldrslt{\ul
 REAPER forum
 }}}
 .\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Thanks!\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Best,\line Dmitri\par}
 }
 ]]></description>
   </metadata>
