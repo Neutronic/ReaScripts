@@ -7,7 +7,7 @@ Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
-  Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=220800
+  Quick Adder 2 forum thread http://bit.ly/getQA2
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
   + custom resizable GUI
