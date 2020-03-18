@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.0
+Version: 2.01
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,9 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + custom resizable GUI
-  + in-script favorites system
-  # many UX improvements (check the demo video - http://bit.ly/seeQA2)
+  #temporarily disable VST cross-checking
 --]]
 
 local rpr = {}
@@ -629,11 +627,11 @@ function getDb(refresh)
       if _timers.db_defer.up then
         _timers.db_defer = nil
 
-        local r_ini = getContent(reaper.get_ini_file())
+        --[[local r_ini = getContent(reaper.get_ini_file())
         rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
         r_ini = nil
         fx_dir_list = getFxDir(rpr.vstpath)
-        fx_file_list = listArrayDirFiles(fx_dir_list)
+        fx_file_list = listArrayDirFiles(fx_dir_list)]]
         --rpr.aupath = os_is.mac and {"Library/Audio/Plug-Ins/Components",
         --              "~/Library/Audio/Plug-Ins/Components"} or nil
         --au_dir_list = os_is.mac and getFxDir(rpr.aupath) or nil
@@ -1059,7 +1057,7 @@ function getVst()
     
     if vst_name:match("^[#<]") then goto SKIP end -- if exclude or shell
     
-    if not fx_file_list[vst_file] and 
+    if fx_file_list and not fx_file_list[vst_file] and 
        not vst_name:lower():match("cockos") then goto SKIP end
     
     local vst_i, sub_tbl = vst_name:match("!!!VST(i)")
