@@ -295,8 +295,8 @@ function listFiles(path, ext)
       local fx_type = ext == "RfxChain" and "CHAIN" or ext == "RTrackTemplate" and "TEMPLATE"
       table.insert(file_list, fx_type .. ":" .. file .. "|,|" .. [[]] .. path .. [[]] .. "|,||,||,|")
       ::SKIP::
-    elseif file:match("^.+jsfx$") or not file:match("%.") or
-           not ext and file:match("%d%.%d") then -- if JS
+    elseif file:match("^.+jsfx$") or not ext and
+           (not file:match("%.") or file:match("%d%.%d")) then -- if JS
       table.insert(file_list, path .. file)
     end
     i = i + 1
@@ -538,6 +538,8 @@ function truncateString(x1, x2, str, str_w, offset)
 end
 
 function exit_states()
+  if scr.quit then return end
+  scr.quit = true
   local _, wnd_x, wnd_y, _, h = gfx.dock(-1, 0, 0, 0, 0)
   wnd_y = macYoffset(gui.wnd_h, gui.Row1.h + gui.row_h + gui.border * 2, wnd_y)
   config.wnd_x = wnd_x
@@ -3961,3 +3963,5 @@ end
 main()
 
 getDb()
+
+reaper.atexit(exit_states)
