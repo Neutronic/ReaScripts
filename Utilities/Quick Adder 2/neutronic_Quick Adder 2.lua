@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.01
+Version: 2.05
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,12 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # temporarily disable VST cross-checking
+  + option to not show FX/track template GUI after insertion
+  + prompt to insert tracks to put FX on, when there are no tracks in project
+    and master track is unselected
+  + pass Ctrl(Cmd)+Z and Ctrl(Cmd)+Shift+Z to main window
+  + double click speed variable in the cfg file (dbl_click_speed)
+  # slightly increased double click speed
 --]]
 
 local rpr = {}
@@ -424,6 +429,8 @@ if not pcall(doFile, scr.config) then
   keep_states.GROUP_FLAGS_HIGH = keep_states.GROUP_FLAGS
 end
 
+config.dbl_click_speed = config.dbl_click_speed and config.dbl_click_speed or 0.25
+
 config2 = config
 config = nil
 local config = config2
@@ -450,7 +457,7 @@ end
 if os_is.win and config.mode == "AU" then config.mode = "ALL" end
 
 if config.os ~= cur_os then
-  add_h = config.os:lower():match("osx") and "win" or "mac"
+  --add_h = config.os:lower():match("osx") and "win" or "mac"
   config.os = cur_os
   if os_is.mac then
     config.global_types_n = not global_types.AU and config.global_types_n + 1 or config.global_types_n
@@ -702,7 +709,6 @@ function doAdd()
   if scr.results_list[gui.Results.sel]:match("^(%w+).+") == "TEMPLATE" and
      (gui.m_cap == 0 or gui.m_cap == mouse_mod.clear) then
     ttAdd(scr.results_list[gui.Results.sel])
-    pass = true
   elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") ~= "TEMPLATE" then
     if gui.m_cap == mouse_mod.track or
        gui.m_cap == mouse_mod.lmb or
@@ -714,7 +720,6 @@ function doAdd()
        gui.m_cap == mouse_mod.lmb + mouse_mod.input + mouse_mod.clear then
       reaper.PreventUIRefresh(1)
         fxTrack()
-        pass = true
       reaper.PreventUIRefresh(-1)
     elseif gui.m_cap == mouse_mod.take or
            gui.m_cap == mouse_mod.lmb + mouse_mod.take or
@@ -722,7 +727,6 @@ function doAdd()
            gui.m_cap == mouse_mod.lmb + mouse_mod.take + mouse_mod.clear then
       reaper.PreventUIRefresh(1)
         fxItem()
-        pass = true
       reaper.PreventUIRefresh(-1)  
     end
   end
@@ -772,12 +776,22 @@ function fxTrack(sel_tr_count, is_m_sel)
 
       if wait_result then wait_result = nil gui.reopen = true end
   else
-    local answ = reaper.MB("Select tracks to put the fx on.", "REASCRIPT Query", 1)
-    if answ == 1 then
-      wait_result = scr.results_list[gui.Results.sel]
-      waitTrack()
+    if reaper.CountTracks(0) == 0 then
+      local answ = reaper.MB("There are no tracks in the project.\n" ..
+                              "Do you want to insert tracks to put the FX on?", "REASCRIPT Query", 1)
+      if answ == 1 then
+        reaper.Main_OnCommand(41067, 0) -- Track: Insert multiple new tracks
+        wait_result = scr.results_list[gui.Results.sel]
+        waitTrack()
+      end
     else
-      return
+      local answ = reaper.MB("Select tracks to put the FX on.", "REASCRIPT Query", 1)
+      if answ == 1 then
+        wait_result = scr.results_list[gui.Results.sel]
+        waitTrack()
+      else
+        return
+      end
     end
   end
 end
@@ -802,102 +816,6 @@ function fxFlush(object, kind)
     for i = 0, fx_count do
       reaper.TakeFX_SetOffline(object, 0, true)
       reaper.TakeFX_Delete(object, 0)
-    end
-  end
-end
-
-function templateSingle(tracks, sel_tr, i)
-  local track_1_sub = tracks[1]
-  local tr = reaper.GetSelectedTrack(0, i)
-  fxFlush(tr, 1)
-  for k, v in pairs(sel_tr[i+1]["states"]) do -- recall states
-    if tracks[1]:match(k) then
-      track_1_sub = track_1_sub:gsub(k..".-\n", v, 1)
-    else
-      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0  "..v, 1)
-    end
-  end
-  if keep_states.ITEMS == true then
-    track_1_sub = track_1_sub:gsub("<ITEM.+", ">")
-    for m = #sel_tr[i+1]["items"], 1, -1 do -- recall items
-      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0"..sel_tr[i+1]["items"][m].."\n")
-    end
-  end
-  reaper.SetTrackStateChunk(tr, track_1_sub, false)
-end
-
-function templateMulti(tracks, sel_tr, first_sel_tr, first_sel_tr_idx)
-  for i = 0, #tracks do
-    if i == #tracks then
-      templateSingle(tracks, sel_tr, 0)
-    elseif i ~= 0 then
-      reaper.InsertTrackAtIndex(first_sel_tr_idx + i, false)
-      local tr = reaper.GetTrack(0, first_sel_tr_idx + i)
-      reaper.SetTrackStateChunk(tr, tracks[i+1], false)
-    end
-  end
-end
-
-function ttKeepers(tracks, sel_tr, tr_chunk, state, i)
-  if state == "ISBUS" and #tracks > 1 then return end
-  local save_state = tr_chunk:match(state..".-\n")
-  sel_tr[i+1]["states"][state] = save_state
-end
-
-function ttApply(template, sel_tr_count) 
-  local content = getContent(template)
-  if not content then notFound(true) return end
-  content = content:gsub("{.-}", "")
-  
-  local first_sel_tr_idx
-  
-  local tracks = {}
-  
-  repeat
-    local track = content:match("(<TRACK.-)>(\n<TR)")
-    if track then
-      track = track..">\n"
-      table.insert(tracks, track)
-      track = track:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%0")
-      content = content:gsub(track, "")
-    end
-  until not track
-  table.insert(tracks, content)
-  
-  if content == "" or sel_tr_count == 0 then close_undo() return end  
-  
-  first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
-  
-  first_sel_tr_idx = math.floor(first_sel_tr_idx)
-  
-  local sel_tr = {}
-  
-  for i = 0, sel_tr_count - 1 do
-    local tr = reaper.GetSelectedTrack(0, i)
-    sel_tr[i+1] = {states = {}}
-    local tr_chunk = select(2, reaper.GetTrackStateChunk(tr, "", false))
-    if keep_states.ITEMS == true then
-      sel_tr[i+1].items = {}
-      for item in tr_chunk:gmatch("<ITEM.->\n>") do
-        table.insert(sel_tr[i+1].items, item)
-      end
-    end
-    for k, v in pairs(keep_states) do
-      if v == true then
-        ttKeepers(tracks, sel_tr, tr_chunk, k, i)
-      end
-    end
-  end
-
-  for i = 1, #tracks do -- fix sends
-    tracks[i] = tracks[i]:gsub("(AUXRECV )(%d+)", function(a, b) b = tonumber(b) + first_sel_tr_idx return a..b end)
-  end
-  
-  if #tracks > 1 then -- if template has multiple tracks then apply to first selected track
-    templateMulti(tracks, sel_tr, first_sel_tr, first_sel_tr_idx)
-  else
-    for i = 0, sel_tr_count - 1 do
-      templateSingle(tracks, sel_tr, i)
     end
   end
 end
@@ -961,23 +879,23 @@ function fxTrack_Float(track, name)
       local chunk = select(2, reaper.GetTrackStateChunk(track, "", false))
       local is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.-SHOW (%d+)"))
       if not is_fxc_vis or is_fxc_vis == 0 then -- if FX chain is hidden
-        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 3)
+        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, config.fx_hide and 2 or 3)
       else
         reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 2)
       end
     else
-      reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 1)
+      reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, config.fx_hide and 2 or 1)
     end
   else
     if not name:match("%.RfxChain") then -- if not chain
       local is_fxc_vis = reaper.TrackFX_GetChainVisible(track)
       if is_fxc_vis == -1 then -- if FX chain is hidden
-        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 3)
+        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, config.fx_hide and 2 or 3)
       else
         reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 2)
       end
     else
-      reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 1)
+      reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, config.fx_hide and 2 or 1)
     end
   end
 end
@@ -1007,9 +925,14 @@ function fxItem(sel_it_count)
 
         if i == 0 then
           if not name:match("%.RfxChain") then -- if not chain
-            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 3)
+            local is_fxc_vis = reaper.TakeFX_GetChainVisible(take)
+            if is_fxc_vis == -1 then -- if FX chain is hidden
+              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, config.fx_hide and 2 or 3)
+            else
+              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 2)
+            end
           else
-            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 1)
+            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, config.fx_hide and 2 or 1)
           end
         end
       end
@@ -1154,7 +1077,7 @@ function getResultsList(fx_type)
     local l, part_match = v:match("(.-)|,|.+"):lower()
     for m = 1, #scr.query_parts do
       --
-      if scr.query_parts[m]:match("^/%P+") then goto PART_SKIP end -- if flag
+      if scr.query_parts[m]:match("^/") then goto PART_SKIP end -- if flag
       
       --[[if #scr.query_parts == 1 then
         for k, v in pairs(sh_list) do
@@ -1214,6 +1137,116 @@ function getResultsList(fx_type)
   end
 end
 
+function fxWndHideChunk(chunk)
+  chunk = chunk:gsub("SHOW %d+", "SHOW 0"):gsub("FLOAT ", "FLOATPOS ")
+  return chunk
+end
+
+function ttKeepers(tracks, sel_tr, tr_chunk, state, i)
+  if state == "ISBUS" and #tracks > 1 then return end
+  local save_state = tr_chunk:match(state..".-\n")
+  sel_tr[i+1]["states"][state] = save_state
+end
+
+function templateSingle(tracks, sel_tr, i)
+  local track_1_sub = tracks[1]
+  local tr = reaper.GetSelectedTrack(0, i)
+  fxFlush(tr, 1)
+  for k, v in pairs(sel_tr[i+1]["states"]) do -- recall states
+    if tracks[1]:match(k) then
+      track_1_sub = track_1_sub:gsub(k..".-\n", v, 1)
+    else
+      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0  "..v, 1)
+    end
+  end
+  if keep_states.ITEMS == true then
+    track_1_sub = track_1_sub:gsub("<ITEM.+", ">")
+    for m = #sel_tr[i+1]["items"], 1, -1 do -- recall items
+      track_1_sub = track_1_sub:gsub("<TRACK.-\n", "%0"..sel_tr[i+1]["items"][m].."\n")
+    end
+  end
+  if config.fx_hide then
+    track_1_sub = fxWndHideChunk(track_1_sub)
+  end
+  reaper.SetTrackStateChunk(tr, track_1_sub, false)
+  if reaper.TrackFX_GetChainVisible(tr) == -2 then
+    reaper.TrackFX_Show(tr,0,1)
+  end
+end
+
+function templateMulti(tracks, sel_tr, first_sel_tr, first_sel_tr_idx)
+  for i = 0, #tracks do
+    if i == #tracks then
+      templateSingle(tracks, sel_tr, 0)
+    elseif i ~= 0 then
+      reaper.InsertTrackAtIndex(first_sel_tr_idx + i, false)
+      local tr = reaper.GetTrack(0, first_sel_tr_idx + i)
+      if config.fx_hide then
+        tracks[i+1] = fxWndHideChunk(tracks[i+1])
+      end
+      reaper.SetTrackStateChunk(tr, tracks[i+1], false)
+    end
+  end
+end
+
+function ttApply(template, sel_tr_count) 
+  local content = getContent(template)
+  if not content then notFound(true) return end
+  content = content:gsub("{.-}", "")
+  
+  local first_sel_tr_idx
+  
+  local tracks = {}
+  
+  repeat
+    local track = content:match("(<TRACK.-)>(\n<TR)")
+    if track then
+      track = track..">\n"
+      table.insert(tracks, track)
+      track = track:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%0")
+      content = content:gsub(track, "")
+    end
+  until not track
+  table.insert(tracks, content)
+  
+  if content == "" or sel_tr_count == 0 then close_undo() return end  
+  
+  first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
+  
+  first_sel_tr_idx = math.floor(first_sel_tr_idx)
+  
+  local sel_tr = {}
+  
+  for i = 0, sel_tr_count - 1 do
+    local tr = reaper.GetSelectedTrack(0, i)
+    sel_tr[i+1] = {states = {}}
+    local tr_chunk = select(2, reaper.GetTrackStateChunk(tr, "", false))
+    if keep_states.ITEMS == true then
+      sel_tr[i+1].items = {}
+      for item in tr_chunk:gmatch("<ITEM.->\n>") do
+        table.insert(sel_tr[i+1].items, item)
+      end
+    end
+    for k, v in pairs(keep_states) do
+      if v == true then
+        ttKeepers(tracks, sel_tr, tr_chunk, k, i)
+      end
+    end
+  end
+
+  for i = 1, #tracks do -- fix sends
+    tracks[i] = tracks[i]:gsub("(AUXRECV )(%d+)", function(a, b) b = tonumber(b) + first_sel_tr_idx return a..b end)
+  end
+  
+  if #tracks > 1 then -- if template has multiple tracks then apply to first selected track
+    templateMulti(tracks, sel_tr, first_sel_tr, first_sel_tr_idx)
+  else
+    for i = 0, sel_tr_count - 1 do
+      templateSingle(tracks, sel_tr, i)
+    end
+  end
+end
+
 function inFolderPrepare(sel_tr_count)
   local f_depth, tr
   if reaper.CountTracks(0) > 0 then
@@ -1227,18 +1260,18 @@ function inFolderPrepare(sel_tr_count)
       tr = reaper.GetTrack(0, reaper.CountTracks(0) - 1)
     end
     reaper.SetOnlyTrackSelected(tr)
-    reaper.Main_OnCommand(40914, 0)
+    reaper.Main_OnCommand(40914, 0) -- Track: Set first selected track as last touched track
   end
   return f_depth
 end
 
 function inFolderSet(f_depth, option)
-  if option == 0 then
+  --[[if option == 0 then
     if f_depth and f_depth < 0 then
       local tr = reaper.GetSelectedTrack(0, reaper.CountSelectedTracks(0) - 1)
       reaper.SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", f_depth)
     end
-  elseif option == 1 then
+  elseif option == 1 then]]
     if f_depth and f_depth < 0 then
       local tr = reaper.GetSelectedTrack(0, reaper.CountSelectedTracks(0) - 1)
       local f_depth2 = reaper.GetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH")
@@ -1247,9 +1280,10 @@ function inFolderSet(f_depth, option)
       end
       reaper.SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", f_depth)
     end
-  end
+  --end
 end
 
+function _ttAdd()end
 function ttAdd(v)
   local template_inst, apply, tt_mode, name
   local sel_tr_count = reaper.CountSelectedTracks(0)
@@ -1274,20 +1308,32 @@ function ttAdd(v)
   if apply then
     ttApply(track_template, sel_tr_count)
   else
+    function ttInsert(temp_template)
+      if config.fx_hide then
+        local content = getContent(track_template)
+        content = fxWndHideChunk(content)
+        temp_template = scr.dir .. "temp.RTrackTemplate"
+        writeFile(temp_template, content)
+      end
+      reaper.Main_openProject(temp_template or track_template)
+      if config.fx_hide then os.remove(temp_template) end
+    end
     local t_temp = {}
     reaper.PreventUIRefresh(1)
     local f_depth = inFolderPrepare(sel_tr_count)
     if template_inst then
       for i = 1, template_inst do
-        reaper.Main_openProject(track_template)
-        table.insert(t_temp, reaper.GetSelectedTrack(0, 0))
+        ttInsert()
+        for i = 0, reaper.CountSelectedTracks(0) - 1 do
+          table.insert(t_temp, reaper.GetSelectedTrack(0, i))
+        end
       end
       for i = 1, #t_temp do
         reaper.SetTrackSelected(t_temp[i], 1)
       end
       inFolderSet(f_depth, 0)
     else
-      reaper.Main_openProject(track_template)
+      ttInsert()
       inFolderSet(f_depth, 1)
     end
     reaper.PreventUIRefresh(-1)
@@ -1385,6 +1431,7 @@ Additional keyboard shortcuts:
   F10: make GUI larger;
   ESC: clear search query;
   TAB: toggle Search Filter Tray visibility;
+  ]] .. mouse_mod[16]() .. [[ + W: show FX window toggle;
   ~: toggle the Keep Open mode.
   
   While Search Filter Tray is open:
@@ -1881,9 +1928,10 @@ function gui:onClick()
   elseif gui.m_cap&3 == 0 and gui.active and gui.active:isOver() and
         (gui.active.id:match("result.+(%d+)") or not gui.active.on_select) then
     if not _timers.double_click then
-      _timers.double_click = timer:new():start(0.2)
+      _timers.double_click = timer:new():start(config.dbl_click_speed)
+      double_clicked_id = gui.active.id
     elseif _timers.double_click then
-      mouse_enter = true
+      double_clicked = true
       _timers.double_click = nil
     end
     gui.clicked = {id = gui.active.id, m_cap = gui.active.m_cap, o = gui.active} 
@@ -2091,8 +2139,58 @@ function gui:drawMGright()
   return self
 end
 
+function gui:drawFloat(state)
+  color(self.font_c - (state and 90 or 0))
+  local r = config.multi == res_multi["|720p"] and 10 or
+            config.multi == res_multi["|1080p"] and 14 or
+            config.multi == res_multi["|4k"] and 32 or
+            config.multi == res_multi["|5k"] and 44 or
+            config.multi == res_multi["|8k"] and 64
+  local width = config.multi == res_multi["|720p"] and 1 or
+                config.multi == res_multi["|1080p"] and 1 or
+                config.multi == res_multi["|4k"] and 3 or
+                config.multi == res_multi["|5k"] and 4 or
+                config.multi == res_multi["|8k"] and 6
+  local k2_y = config.multi == res_multi["|720p"] and 6 or
+               config.multi == res_multi["|1080p"] and 9 or
+               config.multi == res_multi["|4k"] and 19 or
+               config.multi == res_multi["|5k"] and 27 or
+               config.multi == res_multi["|8k"] and 36
+  local km_y = config.multi == res_multi["|720p"] and 4 or
+               config.multi == res_multi["|1080p"] and 7 or
+               config.multi == res_multi["|4k"] and 12 or
+               config.multi == res_multi["|5k"] and 17 or
+               config.multi == res_multi["|8k"] and 24
+  local pad = config.multi == res_multi["|720p"] and 2 or
+               config.multi == res_multi["|1080p"] and 1 or
+               config.multi == res_multi["|4k"] and 0 or
+               config.multi == res_multi["|5k"] and 1 or
+               config.multi == res_multi["|8k"] and -3
+  local x = self.x1 + pad
+  local y = self.y1 + (self.h - r)/2 - 1              
+  
+  color(self.font_c - (state and 90 or 0))
+  local m = (config.multi == res_multi["|1080p"] and 1 or 3)*config.multi
+  local knob = width * 3
+  gfx.rect(x + width * (config.multi == res_multi["|1080p"] and 4 or 3),
+           y + width + (config.multi == res_multi["|1080p"] and 2 or 0),
+           width, r - width * 4 + m, 1)
+  gfx.rect(x + r + m - width * 4,
+           y + width + (config.multi == res_multi["|1080p"] and 2 or 0),
+           width, r - width * 4 + m, 1)
+  
+  gfx.rect(x + width * (config.multi == res_multi["|1080p"] and 3 or 2),
+           y + (state and km_y or width*(config.multi == res_multi["|1080p"] and 5 or 2)),
+           knob, knob, 1)
+           
+  gfx.rect(x + r + m - width * 5,
+           y + (state and km_y or k2_y),
+           knob, knob, 1)
+          
+end
+
 function gui:drawPin(state)
-  color(self.font_c)
+  color(self.font_c - (state and 0 or 90))
   local x = self.x1 + self.w / 2 - (config.multi == res_multi["|1080p"] and rpr.ver >= 6 and 0 or 1)
   local y = self.y1 + self.h / 2 - (config.multi == res_multi["|1080p"] and rpr.ver >= 6 and 0 or 1)
   local r = config.multi == res_multi["|720p"] and 5 or
@@ -2108,7 +2206,7 @@ function gui:drawPin(state)
   gfx.circle(x, y, r, 1)
   color(self:bttnOver(self.c))
   gfx.circle(x, y, r - width, 1)
-  color(self.font_c)
+  color(self.font_c - (state and 0 or 90))
   local width_2 = config.multi == res_multi["|720p"] and width * 2 or
           config.multi == res_multi["|1080p"] and width * 3 or
           config.multi == res_multi["|4k"] and width * 2 or
@@ -2487,6 +2585,14 @@ scr.actions.pin = function()
     config.pin = false
   else
     config.pin = true
+  end
+end
+
+scr.actions.float = function()
+  if config.fx_hide then
+    config.fx_hide = false
+  else
+    config.fx_hide = true
   end
 end
 
@@ -2971,11 +3077,21 @@ gui.hints.generate = function(id)
     elseif id == "reminder" or id == "reminder_exp" then
       gui.hints_txt = "Reminder to support the development"
     elseif id == "pin" then
-      if config.pin == false then
-        gui.hints_txt = "Keep the script open (off) [~]"
+      local txt = "Keep the script open "
+      local sh = " [~]"
+      if not config.pin then
+        gui.hints_txt = txt .. "(off)" .. sh
       else
-        gui.hints_txt = "Keep the script open (on) [~]"
+        gui.hints_txt = txt .. "(on)" .. sh
       end
+    elseif id == "float" then
+      local txt = "Show FX window after insertion "
+      local sh = " [" .. mouse_mod[16]() .. " + W]"
+      if config.fx_hide then
+        gui.hints_txt = txt .. "(off)" .. sh
+      else
+        gui.hints_txt = txt .. "(on)" .. sh
+      end  
     elseif id == "view_prefs" then
       gui.hints_txt = "Open Quick Adder preferences [F3]"
     elseif id and id:match("fav") then
@@ -3062,8 +3178,18 @@ function mainView()
   gui.Row1.Prefs = gui.Row1:setChild{id = "view_prefs", bttn = true,
                    w = math.floor(gui.Row1.h * (os_is.mac and config.multi == 1 and 2.2 or 2.1)),
                    float_l = gui.Row1.Reminder}
-  gui.Row1.Pin = gui.Row1:setChild{id = "pin", bttn = true, w = gui.Row1.h, float_l = gui.Row1.Prefs}
-  gui.Row1.Hints = gui.Row1:setChild{id = "hints", float_l_auto_w = gui.Row1.Pin}
+  gui.Row1.Pin = gui.Row1:setChild{id = "pin", bttn = true,
+                                   w = gui.Row1.h*(config.multi == res_multi["|8k"] and 1.1 or
+                                                   config.multi == res_multi["|720p"] and 0.95 or
+                                                   1),
+                                   float_l = gui.Row1.Prefs}                 
+  gui.Row1.Float = gui.Row1:setChild{id = "float", bttn = true,
+                                     w = gui.Row1.h*(config.multi == res_multi["|720p"] and 0.95 or
+                                                     config.multi == res_multi["|1080p"] and 0.72 or
+                                                     config.multi == res_multi["|8k"] and 0.82 or
+                                                     0.8),
+                                     float_l = gui.Row1.Pin}                 
+  gui.Row1.Hints = gui.Row1:setChild{id = "hints", float_l_auto_w = gui.Row1.Float}
   gui.Row1.Hints:onClickSpecial()
   gui.Row2 = gui:setChild({id = "row2", h = gui.row_h, float_b = gui.Row1}, true)
    
@@ -3099,6 +3225,8 @@ function mainView()
     gui.Row1.Reminder:hover()
  end
   gui.Row1.Prefs:setStyle("prefs"):setStyle("txt"):drawRect():drawTxt("PREFS")
+  gui.Row1.Float:setStyle("prefs"):setStyle("txt")
+  gui.Row1.Float:drawRect():drawFloat(config.fx_hide)
   gui.Row1.Pin:setStyle("prefs"):setStyle("txt")
   gui.Row1.Pin:drawRect():drawPin(config.pin)
   gui.Row1.Hints:setStyle("prefs"):setStyle("hints_txt"):setStyle("txt")
@@ -3244,7 +3372,7 @@ function mainView()
   
   gui.Row2.Search:textBox(gui.ch)
   gui.init() 
-  gui.ch = gfx.getchar() 
+  gui.ch = gfx.getchar()
 end
 
 function kbActions()
@@ -3324,8 +3452,12 @@ function kbActions()
   end
   ----
   
-  if gui.ch == 326 and #scr.results_list > 0 then -- if ALT+F
+  if gui.ch == 326 and #scr.results_list > 0 and gui.view == "main" then -- if ALT+F
     scr.actions.fav(gui.Results.sel)
+  end
+  
+  if gui.ch == 343 and gui.view == "main" then -- if ALT+W
+    gui.clicked = {id = "float", m_cap = 1, o = gui.Row1.Float}
   end
   
   if gui.ch == ignore_ch.esc and not gui.dd_items or
@@ -3373,6 +3505,12 @@ function kbActions()
         break
       end
     end  
+  elseif gui.ch == 26 and gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
+    reaper.Main_OnCommand(40029, 0) -- Edit: Undo
+    gui.ch = 0
+  elseif gui.ch == 26 and gui.m_cap&mouse_mod.shift == mouse_mod.shift then
+    reaper.Main_OnCommand(40030, 0) -- Edit: Redo
+    gui.ch = 0
   end
 end
 
@@ -3905,7 +4043,7 @@ function main()
     elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == ("hints" or "nav") then -- if right click
       themeSwitch()
     end
-      gui.clicked = nil
+    gui.clicked = nil
   end
   
   if gui.focused then
@@ -3913,33 +4051,38 @@ function main()
   end
   
   kbActions()
-  
   if not gui.search_suspend then-- and gui.str:len() > 1 then
-    if gui.str ~= "" and (scr.re_search or scr.do_search and gui.str ~= gui.str_temp and not get_db) then -- generate matches
-      scr.re_search = nil
+    if gui.str ~= "" and (scr.re_search or
+       scr.do_search and gui.str ~= gui.str_temp and not get_db) then -- generate matches
       gui.str_temp = gui.str
-      gui.Results = {sel = 1}
+      if not gui.str:match(".+[%s/]$") and not gui.str:match(".+/%d+$")
+         or scr.re_search then
+        gui.Results = {sel = 1}
+      end
+      scr.re_search = nil
       parseQuery()
       match_stop = nil
     end
   end
-  
-  if (gui.ch == ignore_ch.enter and not gui.dd_items or mouse_enter) and scr.match_found then
-    mouse_enter = nil
+
+  if (gui.ch == ignore_ch.enter and not gui.dd_items or
+      double_clicked and gui.over == double_clicked_id and gui.over:match("result")) and
+      scr.match_found then
+
     if not config.pin then
       scr.over = true
       gfx.quit()
     end
 
     doAdd()
- 
-    if config.pin and pass then
-      gui.reopen = true pass = nil gui:init()
+
+    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
+      gui.reopen = true gui:init()
     else
       reaper.atexit(exit_states)
     end
   end
-   
+
   --[[if gui.focus ~= 2 then
     local c
     if config.theme == "light" then
@@ -3950,7 +4093,14 @@ function main()
     color(c, nil, nil, 200)
     gfx.rect(0, 0, gfx.w, gfx.h)
   end]]
-   
+  
+  if double_clicked then
+    double_clicked = nil
+  end
+  if not _timers.double_click and double_clicked_id then
+    double_clicked_id = nil
+  end
+  
   if gui.ch == -1 then
     reaper.atexit(exit_states)
   else
