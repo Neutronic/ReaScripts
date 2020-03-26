@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="6f5074ff9f88b212d072e69eef98a57f1b4cdcdb">
+<index version="1" name="Neutronic Scripts" commit="49d55cb6d365de9d0b45715d462a6f9866890da1">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -137,6 +137,11 @@
 + double click speed variable in the cfg file (dbl_click_speed)
 # slightly increased double click speed]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/6f5074ff9f88b212d072e69eef98a57f1b4cdcdb/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.07" author="Neutronic" time="2020-03-26T12:28:24Z">
+        <changelog><![CDATA[+ option to show favorites when the search box is empty
++ ability to reorder favorites with Alt + Shift + Up/Down]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/49d55cb6d365de9d0b45715d462a6f9866890da1/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
