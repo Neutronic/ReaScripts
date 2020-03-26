@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.05
+Version: 2.07
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,12 +10,8 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + option to toggle FX/track template GUI floating after insertion
-  + prompt to insert tracks to put FX on, when there are no tracks in project
-    and master track is unselected
-  + pass Ctrl(Cmd)+Z and Ctrl(Cmd)+Shift+Z to main window
-  + double click speed variable in the cfg file (dbl_click_speed)
-  # slightly increased double click speed
+  + option to show favorites when the search box is empty
+  + ability to reorder favorites with Alt + Shift + Up/Down
 --]]
 
 local rpr = {}
@@ -430,6 +426,11 @@ if not pcall(doFile, scr.config) then
 end
 
 config.dbl_click_speed = config.dbl_click_speed and config.dbl_click_speed or 0.25
+if config.fav_persist == nil then
+  config.fav_persist = true
+else
+  config.fav_persist = config.fav_persist
+end
 
 config2 = config
 config = nil
@@ -1035,11 +1036,11 @@ function getAu()
 end
 
 function doMatch()
-  function matchType(str1, str2)
+  function matchType(excl_1, excl_2)
     getResultsList("FAV")
     for i = 1, #global_types_order do
-      if global_types_order[i] ~= str1 and
-         global_types_order[i] ~= str2 then
+      if global_types_order[i] ~= excl_1 and
+         global_types_order[i] ~= excl_2 then
         if match_stop then return end
         getResultsList(global_types_order[i])
       end
@@ -1047,12 +1048,16 @@ function doMatch()
   end
   
   if config.mode == "ALL" then
+    getResultsListFav()
     matchType("")
   elseif config.mode == "FX" then
+    getResultsListFav(_, true)
     matchType("CHAIN", "TEMPLATE")
   elseif config.mode == "FAV" then
+    getResultsListFav()
     getResultsList("FAV")
   else
+    getResultsListFav(config.mode)
     getResultsList("FAV")
     getResultsList(config.mode)
   end
@@ -1065,7 +1070,29 @@ function doMatch()
   end 
 end
 
+function getResultsListFav(fx_type, fx_only)
+  if gui.str ~= "" then return end
+  for i, v in ipairs(db.FAV) do
+    local l = v:match("(.-)|,|.+"):lower()
+    if fx_type then
+      fx_type_match = l:match("^" .. fx_type:lower())
+    end
+    if fx_only then
+      fx_type_match = l:match("^chain") or l:match("^template")
+    end
+    if fx_type and not fx_type_match or not fx_type and fx_type_match then goto SKIP end
+    if #scr.results_list == config.results_max and config.results_max > 0 then
+      break
+    else
+      table.insert(scr.results_list, v)
+    end
+    ::SKIP::
+    fx_type_match = nil
+  end
+end
+
 function getResultsList(fx_type)
+  if gui.str == "" then return end
   if fx_type == "FAV" and config.mode ~= "ALL" and
      config.mode ~= "FX" and config.mode ~= "FAV" and
      #scr.query_parts > 0 and
@@ -1079,15 +1106,6 @@ function getResultsList(fx_type)
       --
       if scr.query_parts[m]:match("^/") then goto PART_SKIP end -- if flag
       
-      --[[if #scr.query_parts == 1 then
-        for k, v in pairs(sh_list) do
-          if v:lower() == scr.query_parts[m] then
-            goto PART_SKIP
-            break
-          end
-        end
-      end]]
-
       exclude, exclude_word = string.match(scr.query_parts[m], "^(%%%-)(.+)")
       --
       if exclude then
@@ -1700,6 +1718,7 @@ function inBounds()
       gui.active = nil
       gui.m_x_click = nil
       gui.m_y_click = nil
+      double_clicked_id = nil
       if gui.mouse_clicked then
         gui.focused = nil
         gui.dd_items = nil
@@ -2003,7 +2022,7 @@ function gui:drawCbBox()
   local fg_c = config.theme == "light" and self.c or self:setStyle("search") and self.font_c - 25
   
   if gui.active and gui.active.id == self.id or
-     not gui.active and self.id == gui.over then
+     not gui.active and not gui.important and self.id == gui.over then
     fg_c = fg_c + (config.theme == "light" and 55 or 25)
     --color(51,153,255) -- blue
   end
@@ -2434,6 +2453,7 @@ function gui:textBox(ch)
     end
     gui.mode_sel[2] = config.mode
     --gui.str = not gui.dd_items and "" or gui.str
+    scr.actions.clear(_,true)
     gui.dd_active_slot = nil
     scr.re_search = true
     gui.focused = nil
@@ -2569,6 +2589,7 @@ scr.actions.fav = function(id)
       table.remove(db.FAV, i)
       scr.results_list[id] = result
       scr.re_search = true
+      scr.actions.clear(_, true)
       return
     end
     if i == #db.FAV then
@@ -2579,6 +2600,43 @@ scr.actions.fav = function(id)
   end
   scr.re_search = true
 end
+
+scr.actions.favReorder = function()
+  if #db.FAV <= 1 then return end
+  local prev, new_id, fav_id
+  
+  if gui.ch == ignore_ch.up and
+     scr.results_list[gui.Results.sel-1]:match(".+|,|(.+)") == "fav" then
+    prev = scr.results_list[gui.Results.sel-1]
+  elseif gui.ch == ignore_ch.down and
+         scr.results_list[gui.Results.sel+1]:match(".+|,|(.+)") == "fav" then
+    prev = scr.results_list[gui.Results.sel+1]
+  else
+    return
+  end
+  
+  local fav = scr.results_list[gui.Results.sel]
+  local dif = gui.ch == ignore_ch.up and -1 or 1
+
+  for i = 1, #db.FAV do
+    if db.FAV[i] == fav then
+      fav_id = i
+      if prev_id then break end
+    elseif db.FAV[i] == prev then
+      new_id = i
+      if fav_id then break end
+    end
+  end
+  
+  table.remove(db.FAV, (fav_id > new_id and fav_id or new_id))
+  table.remove(db.FAV, (fav_id < new_id and fav_id or new_id))
+  table.insert(db.FAV, (fav_id > new_id and new_id or fav_id), (fav_id > new_id and fav or prev))
+  table.insert(db.FAV, (fav_id < new_id and new_id or fav_id), (fav_id < new_id and fav or prev))
+  
+  scr.actions.clear(_, true, gui.Results.sel + dif)
+  scr.re_search = true
+end
+  
 
 scr.actions.pin = function()
   if config.pin then
@@ -2596,12 +2654,9 @@ scr.actions.float = function()
   end
 end
 
-scr.actions.clear = function()
-  gui.str = ""
-  --gui.result_rows_init = 0
-  gui.Results = {sel = 1}
-  --gui.reinit = true
-  --gui.wnd_h_save = gui.wnd_h
+scr.actions.clear = function(_, keep_str, keep_sel)
+  if not keep_str then gui.str = "" end
+  gui.Results = {sel = keep_sel or 1}
   scr.results_list = {}
   scr.query_parts = {}
   scr.match_found = nil
@@ -2631,6 +2686,7 @@ scr.actions.cb = function(o)
   if o.table_name == "keep_states" and o.id == "cb_GROUP_FLAGS" then
     keep_states.GROUP_FLAGS_HIGH = keep_states.GROUP_FLAGS
   end
+  if not config.fav_persist then scr.actions.clear(_, true) end
 end
 
 scr.actions.addType = function()
@@ -2662,6 +2718,7 @@ scr.actions.modeSet = function(name)
     end
   end
   gui.mode_sel[2] = name
+  scr.actions.clear(_,true)
   gui.focused = nil
   gui.dd_items = nil
   gui.important = nil
@@ -3012,7 +3069,13 @@ gui.hints.generate = function(id)
   end
   
   if gui.view == "main" and #scr.results_list > 0 then
-    if gui.m_cap == mouse_mod.track + mouse_mod.clear and
+    if gui.m_cap&mouse_mod.alt == mouse_mod.alt and
+       gui.m_cap&mouse_mod.shift == mouse_mod.shift then
+       gui.hints_txt = "Move the favorite up or down " ..
+                       "[" .. mouse_mod[mouse_mod.alt]() .. " + "
+                       .. mouse_mod[mouse_mod.shift]() .. " + Up/Down]"
+       return
+    elseif gui.m_cap == mouse_mod.track + mouse_mod.clear and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Clear track FX chain and add FX " ..
                       "[" .. mouse_mod[mouse_mod.clear]() .. " + " .. enter .. "]"
@@ -3066,7 +3129,8 @@ gui.hints.generate = function(id)
       end
     end
     
-    if config.results_max == 0 and #scr.results_list > 0 then
+    if config.results_max == 0 and #scr.results_list > 0 and
+       gui.str ~= "" then
       local fx_name, fx_type = gui.parseResult(scr.results_list[1])
       gui.hints_txt = fx_type .. ": " .. fx_name
       return
@@ -3232,15 +3296,7 @@ function mainView()
   gui.Row1.Hints:setStyle("prefs"):setStyle("hints_txt"):setStyle("txt")
 
   gui.Row1.Hints:drawTxt(gui.hints_txt)
-  
-  --[[if gui.focus == 2 and not gui.dd_items then
-    color(0,120,215)
-    gfx.rect(gui.Row2.x1 - gui.border, gui.Row1.y1 - gui.border,
-             gui.Row2.w + gui.border * 2,
-             gui.Row2.h + gui.border * 2 + gui.Row2.h * #gui.Results + gui.Row1.h,
-             0)
-  end]]
-  
+   
   gui.Row2.dd_Mode:setStyle("mode"):setStyle("mode_txt"):drawRect():getMode()--:color(5):drawBorder()
 
   gui.Row2.Search:setStyle("search"):setStyle("search_txt"):drawRect()
@@ -3272,7 +3328,6 @@ function mainView()
     gui.Row2.Search.Clear:drawRect():drawTxt("✕"):hover()
   end
   
-
   for i = 1, gui.result_rows do
 
     if i == 1 then
@@ -3292,10 +3347,15 @@ function mainView()
     gui.Results[i]:setStyle("search")
     if gui.Results.sel == i then
       gui.Results[i].font_c = config.theme == "light" and gui.Results[i].c or gui.Results[i].font_c
-      gui.Results[i].c = gui.accent_c
-      --gui.Results[i].r = 0--51
-      --gui.Results[i].g = 120--153
-      --gui.Results[i].b = 215--255
+      if gui.m_cap&mouse_mod.alt == mouse_mod.alt and
+         gui.m_cap&mouse_mod.shift == mouse_mod.shift then
+        gui.Results[i].font_c = gui.bg_hue
+        gui.Results[i].r = 253--51
+        gui.Results[i].g = 186--153
+        gui.Results[i].b = 42--255
+      else
+        gui.Results[i].c = gui.accent_c
+      end
     end
     gui.Results[i]:drawRect()
     if i == 1 and gui.Results.sel ~= i then
@@ -3386,8 +3446,14 @@ function kbActions()
       _timers.arrow_key = timer:new():start(0.01)
       if not gui.dd_items then
         if gui.Results.sel < gui.result_rows then
-          gui.Results.sel = gui.Results.sel + 1
-        else
+          if gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
+             gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
+            gui.Results.sel = gui.Results.sel + 1
+          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" then
+            scr.actions.favReorder()
+          end
+        elseif gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
+               gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
           gui.Results.sel = 1
         end
       end
@@ -3399,8 +3465,14 @@ function kbActions()
       _timers.arrow_key = timer:new():start(0.01)
       if not gui.dd_items then
         if gui.Results.sel > 1 then
-          gui.Results.sel = gui.Results.sel - 1
-        else
+          if gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
+             gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
+            gui.Results.sel = gui.Results.sel - 1
+          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" then
+            scr.actions.favReorder()
+          end
+        elseif gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
+               gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
           gui.Results.sel = gui.result_rows
         end
       end
@@ -3460,8 +3532,8 @@ function kbActions()
     gui.clicked = {id = "float", m_cap = 1, o = gui.Row1.Float}
   end
   
-  if gui.ch == ignore_ch.esc and not gui.dd_items or
-     #scr.results_list > 0 and gui.str == "" and gui.wnd_h ~= 55 then 
+  if gui.ch == ignore_ch.esc and not gui.dd_items and gui.m_cap == 0 or
+     gui.ch == white_ch.bs and #scr.results_list > 0 and gui.str:len() == 1 and gui.wnd_h ~= 55 then 
     scr.actions.clear()
   elseif gui.ch == ignore_ch.enter and gui.dd_items and gui.view == "main" then
     gui.ch = 0
@@ -3526,7 +3598,7 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_2 = gui.Prefs.Body:setChild({id = "section_2", h = (57 + padding) * config.multi,
                              float_b = gui.Prefs.Body.Section_1}, true, true, padding, padding * 1.5, true)
                              
-    gui.Prefs.Body.Section_3 = gui.Prefs.Body:setChild({id = "Section_3", h = (57 + padding) * config.multi,
+    gui.Prefs.Body.Section_3 = gui.Prefs.Body:setChild({id = "Section_3", h = (83 + padding) * config.multi,
                              float_b = gui.Prefs.Body.Section_2}, true, true, padding, padding * 1.5, true)
     
     
@@ -3576,8 +3648,10 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_1:setStyle("dd")
     gui.Prefs.Body.Section_1.Cb = gui.Prefs.Body.Section_1:setCheckBox({
                                   id = "",
+                                  x1 = gui.Prefs.Body.Section_1.x1 + 1 * config.multi,
                                   float_b = gui.Prefs.Body.Section_1.Title,
-                                  table = "global_types", margin = 5})
+                                  margin = padding * math.floor(config.multi)})    
+    gui.Prefs.Body.Section_1.Cb:setStyle("cb")                              
                                   
     gui.Prefs.Body.Section_1.dd = gui.Prefs.Body.Section_1:setChild{
                                     id = "",
@@ -3749,6 +3823,14 @@ gui.prefs_page = function(page)
       gui.Prefs.Body.Section_3.Results_max:drawBorder():drawTxt(config.results_max)
     end
     
+    gui.Prefs.Body.Section_3.Cb_1 = gui.Prefs.Body.Section_1.Cb:setChild({
+                                         id = "cb_fav_persist",
+                                         float_b = gui.Prefs.Body.Section_3.Default_mode,
+                                         float_r = gui.Prefs.Body.Section_3.Default_mode,
+                                         }, nil, nil, nil, padding)
+      
+    gui.Prefs.Body.Section_3.Cb_1:drawRect():setStyle("search")
+    gui.Prefs.Body.Section_3.Cb_1:drawCb("Show favorites when the search box is empty")
     
     do -- DATABASE REFRESH OPTIONS
     
@@ -3856,9 +3938,7 @@ gui.prefs_page = function(page)
                                               " + " .. enter .. "\" adds track templates")
     
     gui.Prefs.Body.Section_1.x1 = gui.Prefs.Body.Section_1.x1 - math.floor(config.multi)
-    gui.Prefs.Body.Section_2.x1 = gui.Prefs.Body.Section_2.x1 - math.floor(config.multi)                                          
-    --gui.Prefs.Body.Section_1.h = gui.Prefs.Body.Section_1.h + padding * 0.5
-    --gui.Prefs.Body.Section_1.y2 = gui.Prefs.Body.Section_1.y2 + padding * 0.5
+    gui.Prefs.Body.Section_2.x1 = gui.Prefs.Body.Section_2.x1 - math.floor(config.multi)
     gui.Prefs.Body.Section_1:drawBorder()
     gui.Prefs.Body.Section_2:drawBorder()
     gui.Prefs.Body.Section_1.Title:drawTitle()
@@ -3978,7 +4058,7 @@ function prefsView()
   gui.Prefs.Nav.Hints = gui.Prefs.Nav:setChild{id = "hints", w = 50 * config.multi,
                                                float_r = gui.Prefs.Nav.About}
   gui.Prefs.Nav.Hints:setStyle("mode"):setStyle("hints_txt")
-  --gui.Prefs.Nav.Hints.pad_y = -2 * config.multi
+
   gui.Prefs.Nav.Hints.txt_align = gui.txt_align["center"]
   gui.Prefs.Nav.Hints:drawTxt(gui.hints_txt) 
   
@@ -4051,17 +4131,27 @@ function main()
   end
   
   kbActions()
+
   if not gui.search_suspend then-- and gui.str:len() > 1 then
     if gui.str ~= "" and (scr.re_search or
        scr.do_search and gui.str ~= gui.str_temp and not get_db) then -- generate matches
       gui.str_temp = gui.str
-      if not gui.str:match(".+[%s/]$") and not gui.str:match(".+/%d+$")
-         or scr.re_search then
-        gui.Results = {sel = 1}
+      if (not gui.str:match(".+[%s/]$") and not gui.str:match(".+/%d+$")
+         or scr.re_search) and #scr.results_list > 0 then
+        gui.Results = {sel = (gui.ch == ignore_ch.f7 or gui.ch == ignore_ch.f8) and
+                       (gui.Results.sel <= config.results_max and gui.Results.sel or
+                        config.results_max) or 1}
       end
       scr.re_search = nil
       parseQuery()
       match_stop = nil
+    elseif config.fav_persist and (
+           gui.str == "" and #scr.results_list == 0 and #db.FAV > 0
+           or scr.re_search) then
+      scr.actions.clear(_, true, gui.Results.sel <= config.results_max and gui.Results.sel or
+                                 config.results_max)
+      scr.re_search = nil
+      doMatch()  
     end
   end
 
@@ -4082,18 +4172,7 @@ function main()
       reaper.atexit(exit_states)
     end
   end
-
-  --[[if gui.focus ~= 2 then
-    local c
-    if config.theme == "light" then
-      c = 200
-    else
-      c = 77
-    end
-    color(c, nil, nil, 200)
-    gfx.rect(0, 0, gfx.w, gfx.h)
-  end]]
-  
+ 
   if double_clicked then
     double_clicked = nil
   end
