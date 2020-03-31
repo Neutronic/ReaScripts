@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.07
+Version: 2.08
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,8 +10,14 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + option to show favorites when the search box is empty
-  + ability to reorder favorites with Alt + Shift + Up/Down
+  + option to clear the search box after FX/template insertion
+  + put VSTi/AUi on a new named/armed/monitored track when no
+    tracks are selected
+  + respect FX filter string rules in REAPER Preferences --> Plug-ins
+  + ESC closes Quick Adder when the search box is empty
+  # constrain favorites reordering to Alt + Shift + Up/Down only
+  # improved "FX not found" warning
+  # updated help file
 --]]
 
 local rpr = {}
@@ -57,7 +63,7 @@ function findContentKey(content, key, self)
     os.getenv("HOME").."/Library/Audio/Plug-Ins/VST;"..
     os.getenv("HOME").."/Library/Audio/Plug-Ins/VST3\n"
   end
-  return content:gsub(key.. "[:=]%s?", "")
+  return content and content:gsub(key.. "[:=]%s?", "") or false
 end
 
 scr.path = select(2, reaper.get_action_context())
@@ -132,6 +138,9 @@ if rpr.x64 then
   end
 else
   rpr.vst = rpr.path .. "/reaper-vstplugins.ini"
+  if os_is.mac then
+    rpr.au = rpr.path .. "/reaper-auplugins.ini"
+  end
 end         
          
 local white_ch = {del = 6579564,
@@ -294,6 +303,8 @@ function listFiles(path, ext)
       if ext == "RfxChain" and not path:match("/FXChains/") then goto SKIP end
       file = file:gsub("%." .. ext, "")
       local fx_type = ext == "RfxChain" and "CHAIN" or ext == "RTrackTemplate" and "TEMPLATE"
+      if rpr.def_fx_filt and ext == "RfxChain" and fxExclCheck(fx_type .. ":" .. file:lower()) then goto SKIP end
+      if rpr.def_fx_filt and ext == "RfxChain" and not fxExclCheck(fx_type .. ":" .. file:lower(), true) then goto SKIP end
       table.insert(file_list, fx_type .. ":" .. file .. "|,|" .. [[]] .. path .. [[]] .. "|,||,||,|")
       ::SKIP::
     elseif file:match("^.+jsfx$") or not ext and
@@ -580,7 +591,12 @@ end
 
 function notFound(is_tt)
   local item = is_tt and "Track template" or "FX"
-  reaper.MB(item .. " not found.", "Quick Adder error", 0)
+  reaper.MB(item .. " not found." .. 
+            (is_tt and "" or
+            "\n\nPlease perform \"Clear cache/re-scan\" in\nREAPER Preferences " ..
+            "--> Plug-ins --> VST\nto remove non-existent FX " ..
+            "from the database."),
+            "Quick Adder 2 error", 0)
 end
 
 function sortAbc(tbl)
@@ -626,6 +642,55 @@ function listArrayDirFiles(dir_list, ext)
   return file_list
 end
 
+function parseIniFxFilt(str)
+  if not str then return end
+  local tbl = {excl = {}, incl = {}}
+  for match in str:gmatch("NOT %( .- %)%s") do
+    local match_ins = match:match("NOT %( (.+ )%)")
+    if match_ins:match("NOT") then return end
+    local tbl2 = {}
+    for phrase in match_ins:gmatch("%(.-%)%s") do
+      table.insert(tbl2, phrase:match("(%(.-%))%s"):lower())
+      match_ins = match_ins:gsub(magicFix(phrase), "")
+    end
+    for word in match_ins:gmatch(".-%s") do
+      table.insert(tbl2, word:match("(.-)%s"):lower())
+    end
+    table.insert(tbl.excl, tbl2)
+    str = str:gsub(magicFix(match), "")
+  end
+  
+  for match in str:gmatch("NOT .-%s") do
+    local match_ins = match:match("NOT (.-%s)")
+    if match_ins == "(" then return end
+    local tbl2 = {}
+    for word in match_ins:gmatch(".-%s") do
+      table.insert(tbl2, word:match("(.-)%s"):lower())
+    end
+    table.insert(tbl.excl, tbl2)
+    str = str:gsub(magicFix(match), "")
+  end
+   
+  for match in str:gmatch("%( .- %)%s") do
+    table.insert(tbl.incl, match:match("%( (.+ )%)"):lower())
+    str = str:gsub(magicFix(match), "")
+  end
+  
+  for match in str:gmatch("%(.-%)%s") do
+    table.insert(tbl.incl, {match:match("%(.+%)"):lower()})
+    str = str:gsub(magicFix(match), "")
+  end
+  
+  for match in str:gmatch(".-%s") do
+    local match_ins = match:match("(.-)%s")
+    if match_ins == "" then goto SKIP end
+    table.insert(tbl.incl, {match:match("(.-)%s"):lower()})
+    ::SKIP::
+  end
+  
+  return tbl
+end
+
 function getDb(refresh)
   if not db.saved then
     function dbDefer(refresh)
@@ -637,8 +702,8 @@ function getDb(refresh)
       if _timers.db_defer.up then
         _timers.db_defer = nil
 
-        --[[local r_ini = getContent(reaper.get_ini_file())
-        rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
+        local r_ini = getContent(reaper.get_ini_file())
+        --[[rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
         r_ini = nil
         fx_dir_list = getFxDir(rpr.vstpath)
         fx_file_list = listArrayDirFiles(fx_dir_list)]]
@@ -646,6 +711,10 @@ function getDb(refresh)
         --              "~/Library/Audio/Plug-Ins/Components"} or nil
         --au_dir_list = os_is.mac and getFxDir(rpr.aupath) or nil
         --au_file_list = os_is.mac and listArrayDirFiles(au_dir_list) or nil
+                                  
+        rpr.def_fx_filt = parseIniFxFilt(findContentKey(r_ini,
+                          rpr.x64 and (os_is.win and "def_fx_filt64" or "def_fx_filtx64") or
+                          os_is.win and "def_fx_filt32" or "def_fx_filtx32"))
         db.VST2 = {}
         db.VST3 = {}
         getVst()
@@ -738,6 +807,15 @@ function clearAddorAdd(s)
          "Clear FX chain" .. s .." and add "
 end
 
+function waitResult()
+  if wait_result then
+    wait_result = nil
+    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
+      gui.reopen = true gui:init()
+    end
+  end
+end
+
 function fxTrack(sel_tr_count, is_m_sel)
   local sel_tr_count = sel_tr_count or reaper.CountSelectedTracks(0)
   local is_m_sel = is_m_sel or reaper.IsTrackSelected(m_track)
@@ -774,24 +852,31 @@ function fxTrack(sel_tr_count, is_m_sel)
 
       reaper.Undo_EndBlock(ca_or_a .. (isInput() and "input " or "") ..
                            undo_name .. " to selected track" .. t_or_t, -1)
-
-      if wait_result then wait_result = nil gui.reopen = true end
+      waitResult()
   else
-    if reaper.CountTracks(0) == 0 then
+    wait_result = scr.results_list[gui.Results.sel]
+    if select(3, gui.parseResult(wait_result)) ~= "" then
+      reaper.InsertTrackAtIndex(reaper.CountTracks(0), false)
+      local tr = reaper.GetTrack(0, reaper.CountTracks(0)-1)
+      reaper.GetSetMediaTrackInfo_String(tr, "P_NAME",
+                                         gui.parseResult(wait_result):match("(.-)%(") or
+                                         gui.parseResult(wait_result):match(".+: (.+)"), true)
+      reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
+      reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", 1)
+      reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", 128+63<<5|0)
+      reaper.SetOnlyTrackSelected(tr)
+      fxTrack(1, false)
+    elseif reaper.CountTracks(0) == 0 then
       local answ = reaper.MB("There are no tracks in the project.\n" ..
                               "Do you want to insert tracks to put the FX on?", "REASCRIPT Query", 1)
       if answ == 1 then
         reaper.Main_OnCommand(41067, 0) -- Track: Insert multiple new tracks
-        wait_result = scr.results_list[gui.Results.sel]
         waitTrack()
       end
     else
       local answ = reaper.MB("Select tracks to put the FX on.", "REASCRIPT Query", 1)
       if answ == 1 then
-        wait_result = scr.results_list[gui.Results.sel]
         waitTrack()
-      else
-        return
       end
     end
   end
@@ -854,7 +939,7 @@ function parseResultsList(v)
 end
 
 function fxTrack_Add(track)
-  local name, undo_name = parseResultsList(wait_result or scr.results_list[gui.Results.sel])
+  local name, undo_name = parseResultsList(--[[wait_result or ]]scr.results_list[gui.Results.sel])
 
   if isClearFx() then
     if not isInput() then
@@ -910,7 +995,7 @@ function fxItem(sel_it_count)
         local item = reaper.GetSelectedMediaItem(0, i)
         local take = reaper.GetActiveTake(item)
         if not take then goto SKIP end
-        name, undo_name = parseResultsList(wait_result or scr.results_list[gui.Results.sel])
+        name, undo_name = parseResultsList(--[[wait_result or ]]scr.results_list[gui.Results.sel])
         
         if isClearFx() then
           fxFlush(take, 3)
@@ -942,7 +1027,7 @@ function fxItem(sel_it_count)
       local ca_or_a = clearAddorAdd(i_or_i)
       
     reaper.Undo_EndBlock(undo_name and ca_or_a..undo_name.." to selected item"..i_or_i or "Run: ReaScript", -1)
-    if wait_result then wait_result = nil gui.reopen = true end
+    waitResult()
   else
     local answ = reaper.MB("Select items to put the FX on.", "REASCRIPT Query", 1)
     if answ == 1 then
@@ -973,6 +1058,26 @@ function waitTrack()
   end
 end
 
+function fxExclCheck(str, include)
+  if include and #rpr.def_fx_filt.incl == 0 then return true end
+  if not include and #rpr.def_fx_filt.excl == 0 then return false end
+  local tbl = include and rpr.def_fx_filt.incl or rpr.def_fx_filt.excl
+  for i = 1, #tbl do
+    local pass = nil
+    for n = 1, #tbl[i] do
+      local str2 = magicFix(tbl[i][n])
+      if n == #tbl[i] and (n == 1 or pass) and str:match(str2) then
+        return true
+      elseif str:match(str2) then
+        pass = true
+      elseif not str:match(str2) then
+        goto SKIP
+      end
+    end
+    ::SKIP::
+  end
+end
+
 function getVst()
   local content = getContent(rpr.vst)
   for line in content:gmatch(".-\n") do
@@ -997,6 +1102,9 @@ function getVst()
       fx_type = "VST3" .. vst_i .. ":"
       sub_tbl = db.VST3
     end
+
+    if rpr.def_fx_filt and fxExclCheck(fx_type:lower():gsub("vst2", "vst") .. vst_name:lower()) then goto SKIP end
+    if rpr.def_fx_filt and not fxExclCheck(fx_type:lower():gsub("vst2", "vst") .. vst_name:lower(), true) then goto SKIP end
     
     local val = fx_type .. vst_name .. "|,|" .. vst_file .. "|,|" .. vst_i .. "|,|" .. vst_id .. "|,|"
     table.insert(sub_tbl, val)
@@ -1016,22 +1124,34 @@ function getJs()
 
     if js_name then
       local path = file_list[i]:gsub(".+/Effects/", "")
+      
+      if rpr.def_fx_filt and fxExclCheck("js:" .. js_name:lower()) then goto SKIP end
+      if rpr.def_fx_filt and not fxExclCheck("js:" .. js_name:lower(), true) then goto SKIP end
+ 
       table.insert(db.JS, "JS:" .. js_name .. "|,|" .. path .. "|,||,||,|")
     end
+    ::SKIP::
   end
-  table.insert(db.JS, "JS:" .. "Video processor" .. "|,|" .. "Video processor" .. "|,||,||,|")
+  
+  if rpr.def_fx_filt and fxExclCheck("js:video processor") then goto SKIP end
+  table.insert(db.JS, "JS:Video processor" .. "|,|" .. "Video processor" .. "|,||,||,|")
+  ::SKIP::
 end
 
 function getAu()
   local content = getContent(rpr.au)
+  if not content then return end
   for line in content:gmatch(".-[\n\r]") do
     if line:match("^.-=.+$") then
       local au_name, au_i = line:match("^(.-)%s-=(.+)$")
       au_i = au_i:match("<inst") and "i" or ""
       if not au_name:match("^#") then
+        if rpr.def_fx_filt and fxExclCheck("au" .. au_i .. ":" .. au_name:lower()) then goto SKIP end
+        if rpr.def_fx_filt and not fxExclCheck("au" .. au_i .. ":" .. au_name:lower(), true) then goto SKIP end
         table.insert(db.AU, "AU" .. au_i .. ":" .. au_name .. "|,||,|" .. au_i .. "|,||,|")
       end
     end
+    ::SKIP::
   end
 end
 
@@ -1082,6 +1202,7 @@ function getResultsListFav(fx_type, fx_only)
     end
     if fx_type and not fx_type_match or not fx_type and fx_type_match then goto SKIP end
     if #scr.results_list == config.results_max and config.results_max > 0 then
+      fx_type_match = nil
       break
     else
       table.insert(scr.results_list, v)
@@ -1447,10 +1568,15 @@ Additional keyboard shortcuts:
   F8: increase the maximum results number;
   F9: make GUI smaller;
   F10: make GUI larger;
-  ESC: clear search query;
+  ESC: close Quick Adder 2;
   TAB: toggle Search Filter Tray visibility;
+  ~: toggle the Keep Open mode;
   ]] .. mouse_mod[16]() .. [[ + W: show FX window toggle;
-  ~: toggle the Keep Open mode.
+  ]] .. mouse_mod[16]() .. [[ + Backspace: clear the search box;
+  ]] .. mouse_mod[mouse_mod.alt]() .. [[ + ]] .. mouse_mod[mouse_mod.shift]() ..
+  [[ + Up: move a favorite up;
+  ]] .. mouse_mod[mouse_mod.alt]() .. [[ + ]] .. mouse_mod[mouse_mod.shift]() ..
+  [[ + Down: move a favorite down.
   
   While Search Filter Tray is open:
     A: set the search filter to ALL (global search);
@@ -3159,10 +3285,10 @@ gui.hints.generate = function(id)
     elseif id == "view_prefs" then
       gui.hints_txt = "Open Quick Adder preferences [F3]"
     elseif id and id:match("fav") then
-      gui.hints_txt = (id:match("_s") and "Remove the result from favorites" or "Add the result to favorites") ..
-                    " [" .. mouse_mod[16]() .. " + F]"
+      gui.hints_txt = (id:match("_s") and "Remove the result from favorites" or
+                       "Add the result to favorites") .. " [" .. mouse_mod[16]() .. " + F]"
     elseif id == "clear" and gui.str ~= "" then
-      gui.hints_txt = "Clear search query [Esc]"
+      gui.hints_txt = "Clear search query [" .. mouse_mod[mouse_mod.alt]() .. " + Backspace]"
     elseif gui.over ~= "view_main" then
       gui.hints_txt = "Press F1 for the help file" --"Search " .. gui.hints[config.mode]
     end
@@ -3446,10 +3572,11 @@ function kbActions()
       _timers.arrow_key = timer:new():start(0.01)
       if not gui.dd_items then
         if gui.Results.sel < gui.result_rows then
-          if gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
-             gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
+          if gui.m_cap == 0 then
             gui.Results.sel = gui.Results.sel + 1
-          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" then
+          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" and
+                 gui.m_cap&mouse_mod.alt == mouse_mod.alt and
+                 gui.m_cap&mouse_mod.shift == mouse_mod.shift then
             scr.actions.favReorder()
           end
         elseif gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
@@ -3465,10 +3592,11 @@ function kbActions()
       _timers.arrow_key = timer:new():start(0.01)
       if not gui.dd_items then
         if gui.Results.sel > 1 then
-          if gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
-             gui.m_cap&mouse_mod.shift ~= mouse_mod.shift then
+          if gui.m_cap == 0 then
             gui.Results.sel = gui.Results.sel - 1
-          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" then
+          elseif scr.results_list[gui.Results.sel]:match(".+|,|(.+)") == "fav" and
+                 gui.m_cap&mouse_mod.alt == mouse_mod.alt and
+                 gui.m_cap&mouse_mod.shift == mouse_mod.shift then
             scr.actions.favReorder()
           end
         elseif gui.m_cap&mouse_mod.alt ~= mouse_mod.alt and
@@ -3526,14 +3654,21 @@ function kbActions()
   
   if gui.ch == 326 and #scr.results_list > 0 and gui.view == "main" then -- if ALT+F
     scr.actions.fav(gui.Results.sel)
-  end
-  
-  if gui.ch == 343 and gui.view == "main" then -- if ALT+W
+  elseif gui.ch == 343 and gui.view == "main" then -- if ALT+W
     gui.clicked = {id = "float", m_cap = 1, o = gui.Row1.Float}
-  end
-  
-  if gui.ch == ignore_ch.esc and not gui.dd_items and gui.m_cap == 0 or
-     gui.ch == white_ch.bs and #scr.results_list > 0 and gui.str:len() == 1 and gui.wnd_h ~= 55 then 
+  elseif gui.ch == ignore_ch.esc and gui.m_cap == 0 and gui.view == "main" then
+    if gui.str == "" and not gui.dd_items then
+      gfx.quit()
+    elseif not gui.dd_items then
+      scr.actions.clear()
+    else
+      gui.clicked = {id = "dd_1_mode", m_cap = 1, o = gui.Row2.dd_Mode}
+    end
+  elseif gui.ch == ignore_ch.esc and gui.m_cap == 0 and gui.view ~= "main" then
+    gfx.quit()
+  elseif gui.ch == white_ch.bs and
+         (#scr.results_list > 0 and gui.str:len() == 1 and gui.wnd_h ~= 55 or
+          gui.m_cap == mouse_mod.alt) then 
     scr.actions.clear()
   elseif gui.ch == ignore_ch.enter and gui.dd_items and gui.view == "main" then
     gui.ch = 0
@@ -3826,11 +3961,21 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_3.Cb_1 = gui.Prefs.Body.Section_1.Cb:setChild({
                                          id = "cb_fav_persist",
                                          float_b = gui.Prefs.Body.Section_3.Default_mode,
-                                         float_r = gui.Prefs.Body.Section_3.Default_mode,
-                                         }, nil, nil, nil, padding)
+                                         --float_r = gui.Prefs.Body.Section_3.Default_mode,
+                                         }, nil, nil, padding, padding)
       
     gui.Prefs.Body.Section_3.Cb_1:drawRect():setStyle("search")
-    gui.Prefs.Body.Section_3.Cb_1:drawCb("Show favorites when the search box is empty")
+    gui.Prefs.Body.Section_3.Cb_1:drawCb("Always show favorites")
+    
+    gui.Prefs.Body.Section_3.Cb_2 = gui.Prefs.Body.Section_1.Cb:setChild({
+                                         id = "cb_clear_search",
+                                         float_b = gui.Prefs.Body.Section_3.Default_mode,
+                                         float_r = gui.Prefs.Body.Section_3.Cb_1,
+                                         }, nil, nil, padding, padding)
+      
+    gui.Prefs.Body.Section_3.Cb_2:drawRect():setStyle("search")
+    gui.Prefs.Body.Section_3.Cb_2:drawCb("Clear search box after insertion")
+    
     
     do -- DATABASE REFRESH OPTIONS
     
@@ -4165,7 +4310,9 @@ function main()
     end
 
     doAdd()
-
+    
+    if config.clear_search then scr.actions.clear() end
+ 
     if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
       gui.reopen = true gui:init()
     else
