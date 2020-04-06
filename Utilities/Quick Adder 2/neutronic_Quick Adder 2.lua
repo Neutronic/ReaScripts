@@ -18,6 +18,7 @@ Changelog:
   + place text box carriage with mouse cursor
   
   NOTE: some new functionality requires SWS and/or JS APIs.
+  
 --]]
 
 local rpr = {}
