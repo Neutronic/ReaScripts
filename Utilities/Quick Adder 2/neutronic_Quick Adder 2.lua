@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.1
+Version: 2.10
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
