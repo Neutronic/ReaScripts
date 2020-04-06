@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.08
+Version: 2.1
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,14 +10,14 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + option to clear the search box after FX/template insertion
-  + put VSTi/AUi on a new named/armed/monitored track when no
-    tracks are selected
-  + respect FX filter string rules in REAPER Preferences --> Plug-ins
-  + ESC closes Quick Adder when the search box is empty
-  # constrain favorites reordering to Alt + Shift + Up/Down only
-  # improved "FX not found" warning
-  # updated help file
+  + drag and drop support
+  + dropping an effect on empty TCP/MCP automatically
+    creates a named track with the effect on it
+  + options for "no track selected" scenario
+  + ability to pin Quick Adder
+  + place text box carriage with mouse cursor
+  
+  NOTE: some new functionality requires SWS and/or JS APIs.
 --]]
 
 local rpr = {}
@@ -457,6 +457,8 @@ global_types_order = nil
 local global_types_order = config2
 config2 = nil
 
+if not config.no_sel_tracks then config.no_sel_tracks = 1 end
+
 if config.db_scan == 2 then
   db.saved = false
 elseif config.db_scan == 1 and reaper.GetExtState("Quick Adder", "SCAN") ~= "1" then
@@ -595,7 +597,8 @@ function notFound(is_tt)
             (is_tt and "" or
             "\n\nPlease perform \"Clear cache/re-scan\" in\nREAPER Preferences " ..
             "--> Plug-ins --> VST\nto remove non-existent FX " ..
-            "from the database."),
+            "from the data-\nbase" ..
+            " and then press F5 in Quick Adder."),
             "Quick Adder 2 error", 0)
 end
 
@@ -644,6 +647,7 @@ end
 
 function parseIniFxFilt(str)
   if not str then return end
+  str = str:gsub("AND", "")
   local tbl = {excl = {}, incl = {}}
   for match in str:gmatch("NOT %( .- %)%s") do
     local match_ins = match:match("NOT %( (.+ )%)")
@@ -775,31 +779,37 @@ function isClearFx()
   end
 end
 
-function doAdd() 
+function doAdd()
   if scr.results_list[gui.Results.sel]:match("^(%w+).+") == "TEMPLATE" and
-     (gui.m_cap == 0 or gui.m_cap == mouse_mod.clear) then
+     ((gui.m_cap == 0 or gui.m_cap == mouse_mod.clear) or
+     gui.m_cap == mouse_mod.lmb or m_obj) then
     ttAdd(scr.results_list[gui.Results.sel])
   elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") ~= "TEMPLATE" then
-    if gui.m_cap == mouse_mod.track or
+    local m_obj_is_tr = reaper.ValidatePtr2(0, m_obj, "MediaTrack*")
+    local m_obj_is_tk = reaper.ValidatePtr2(0, m_obj, "MediaItem_Take*")
+    if gui.m_cap == mouse_mod.track and not m_obj or
        gui.m_cap == mouse_mod.lmb or
-       gui.m_cap == mouse_mod.track + mouse_mod.clear or
+       gui.m_cap == mouse_mod.track + mouse_mod.clear and not m_obj_is_tk or
        gui.m_cap == mouse_mod.lmb + mouse_mod.clear or
        gui.m_cap == mouse_mod.input or
        gui.m_cap == mouse_mod.lmb + mouse_mod.input or
        gui.m_cap == mouse_mod.input + mouse_mod.clear or
-       gui.m_cap == mouse_mod.lmb + mouse_mod.input + mouse_mod.clear then
+       gui.m_cap == mouse_mod.lmb + mouse_mod.input + mouse_mod.clear or
+       m_obj_is_tr or type(m_obj) == "string" then
       reaper.PreventUIRefresh(1)
         fxTrack()
       reaper.PreventUIRefresh(-1)
     elseif gui.m_cap == mouse_mod.take or
            gui.m_cap == mouse_mod.lmb + mouse_mod.take or
            gui.m_cap == mouse_mod.take + mouse_mod.clear or
-           gui.m_cap == mouse_mod.lmb + mouse_mod.take + mouse_mod.clear then
+           gui.m_cap == mouse_mod.lmb + mouse_mod.take + mouse_mod.clear or
+           m_obj_is_tk then
       reaper.PreventUIRefresh(1)
         fxItem()
       reaper.PreventUIRefresh(-1)  
     end
   end
+  if m_obj then gui.active = nil m_obj = nil end
 end
 
 function clearAddorAdd(s)
@@ -819,11 +829,12 @@ end
 function fxTrack(sel_tr_count, is_m_sel)
   local sel_tr_count = sel_tr_count or reaper.CountSelectedTracks(0)
   local is_m_sel = is_m_sel or reaper.IsTrackSelected(m_track)
-  if sel_tr_count > 0 or is_m_sel then
+  if sel_tr_count > 0 and not m_obj or is_m_sel or m_obj and type(m_obj) == "userdata" then
     reaper.Undo_BeginBlock()
       local name, undo_name, fx_i
-      for i = 0, sel_tr_count - 1 do
-        local track = reaper.GetSelectedTrack(0, i)
+       
+      for i = 0, m_obj and 0 or sel_tr_count - 1 do
+        local track = m_obj or reaper.GetSelectedTrack(0, i)
         
         name, undo_name, fx_i = fxTrack_Add(track)
         
@@ -833,8 +844,8 @@ function fxTrack(sel_tr_count, is_m_sel)
           fxTrack_Float(track, name)
         end
       end
-      
-      if is_m_sel then -- if master track is selected
+       
+      if is_m_sel and not m_obj then -- if master track is selected
         name, undo_name, fx_i = fxTrack_Add(m_track)        
         
         if name == "No FX" then return end
@@ -843,6 +854,8 @@ function fxTrack(sel_tr_count, is_m_sel)
           fxTrack_Float(m_track, name)
         end
       end
+      
+      ::SKIP::
       
       if fx_i == -1 then return end
       
@@ -855,28 +868,37 @@ function fxTrack(sel_tr_count, is_m_sel)
       waitResult()
   else
     wait_result = scr.results_list[gui.Results.sel]
-    if select(3, gui.parseResult(wait_result)) ~= "" then
+    if m_obj or config.no_sel_tracks == 2 then
+      if m_obj then gui.active = nil m_obj = nil end
       reaper.InsertTrackAtIndex(reaper.CountTracks(0), false)
       local tr = reaper.GetTrack(0, reaper.CountTracks(0)-1)
       reaper.GetSetMediaTrackInfo_String(tr, "P_NAME",
-                                         gui.parseResult(wait_result):match("(.-)%(") or
-                                         gui.parseResult(wait_result):match(".+: (.+)"), true)
-      reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
-      reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", 1)
-      reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", 128+63<<5|0)
+                                         gui.parseResult(wait_result):match("(.-) ?%(") or
+                                         gui.parseResult(wait_result):match(".+: (.+)") or
+                                         gui.parseResult(wait_result), true)
+      if select(3, gui.parseResult(wait_result)) ~= "" then
+        reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
+        reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", 1)
+        reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", 128+63<<5|0)
+      end
       reaper.SetOnlyTrackSelected(tr)
       fxTrack(1, false)
-    elseif reaper.CountTracks(0) == 0 then
+      return
+    elseif reaper.CountTracks(0) == 0 and config.no_sel_tracks == 1 then
       local answ = reaper.MB("There are no tracks in the project.\n" ..
                               "Do you want to insert tracks to put the FX on?", "REASCRIPT Query", 1)
       if answ == 1 then
         reaper.Main_OnCommand(41067, 0) -- Track: Insert multiple new tracks
         waitTrack()
+      else
+        wait_result = nil
       end
-    else
+    elseif config.no_sel_tracks == 1 then
       local answ = reaper.MB("Select tracks to put the FX on.", "REASCRIPT Query", 1)
       if answ == 1 then
         waitTrack()
+      else
+        wait_result = nil
       end
     end
   end
@@ -907,10 +929,7 @@ function fxFlush(object, kind)
 end
 
 function isInput()
-  if gui.m_cap == mouse_mod.input or
-     gui.m_cap == mouse_mod.lmb + mouse_mod.input or
-     gui.m_cap == mouse_mod.input + mouse_mod.clear or
-     gui.m_cap == mouse_mod.lmb + mouse_mod.input + mouse_mod.clear then
+  if gui.m_cap&mouse_mod.input == mouse_mod.input then
     return true
   else
     return false
@@ -988,12 +1007,13 @@ end
 
 function fxItem(sel_it_count)
   local sel_it_count = sel_it_count or reaper.CountSelectedMediaItems(0)
-  if sel_it_count > 0 then
+  if sel_it_count > 0 or m_obj then
     reaper.Undo_BeginBlock()
       local name, undo_name, fx_i
-      for i = 0, sel_it_count - 1 do
+      
+      for i = 0, m_obj and 0 or sel_it_count - 1 do
         local item = reaper.GetSelectedMediaItem(0, i)
-        local take = reaper.GetActiveTake(item)
+        local take = m_obj and m_obj or reaper.GetActiveTake(item)
         if not take then goto SKIP end
         name, undo_name = parseResultsList(--[[wait_result or ]]scr.results_list[gui.Results.sel])
         
@@ -1023,6 +1043,9 @@ function fxItem(sel_it_count)
         end
       end
       ::SKIP::
+      
+      if m_obj then gui.active = nil m_obj = nil goto SKIP end
+      
       local i_or_i = sel_it_count > 1 and "s" or ""
       local ca_or_a = clearAddorAdd(i_or_i)
       
@@ -1289,7 +1312,7 @@ end
 
 function templateSingle(tracks, sel_tr, i)
   local track_1_sub = tracks[1]
-  local tr = reaper.GetSelectedTrack(0, i)
+  local tr = m_obj or reaper.GetSelectedTrack(0, i)
   fxFlush(tr, 1)
   for k, v in pairs(sel_tr[i+1]["states"]) do -- recall states
     if tracks[1]:match(k) then
@@ -1347,17 +1370,17 @@ function ttApply(template, sel_tr_count)
     end
   until not track
   table.insert(tracks, content)
+
+  if content == "" or not m_obj and sel_tr_count == 0 then close_undo() return end  
   
-  if content == "" or sel_tr_count == 0 then close_undo() return end  
-  
-  first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
+  first_sel_tr_idx = reaper.GetMediaTrackInfo_Value(m_obj or reaper.GetSelectedTrack(0, 0), "IP_TRACKNUMBER") - 1
   
   first_sel_tr_idx = math.floor(first_sel_tr_idx)
   
   local sel_tr = {}
   
-  for i = 0, sel_tr_count - 1 do
-    local tr = reaper.GetSelectedTrack(0, i)
+  for i = 0, m_obj and 0 or sel_tr_count - 1 do
+    local tr = m_obj or reaper.GetSelectedTrack(0, i)
     sel_tr[i+1] = {states = {}}
     local tr_chunk = select(2, reaper.GetTrackStateChunk(tr, "", false))
     if keep_states.ITEMS == true then
@@ -1380,7 +1403,7 @@ function ttApply(template, sel_tr_count)
   if #tracks > 1 then -- if template has multiple tracks then apply to first selected track
     templateMulti(tracks, sel_tr, first_sel_tr, first_sel_tr_idx)
   else
-    for i = 0, sel_tr_count - 1 do
+    for i = 0, m_obj and 0 or sel_tr_count - 1 do
       templateSingle(tracks, sel_tr, i)
     end
   end
@@ -1443,20 +1466,35 @@ function ttAdd(v)
   
   local track_template = path .. name .. ".RTrackTemplate"
   
+  function ttInsert(temp_template)
+    if config.fx_hide then
+      local content = getContent(track_template)
+      content = fxWndHideChunk(content)
+      temp_template = scr.dir .. "temp.RTrackTemplate"
+      writeFile(temp_template, content)
+    end
+    reaper.Main_openProject(temp_template or track_template)
+    if config.fx_hide then os.remove(temp_template) end
+  end
+  
   reaper.Undo_BeginBlock()
-  if apply then
+  if m_obj then
+      reaper.PreventUIRefresh(1)
+        if type(m_obj) == "string" then  
+          pcall(reaper.SetOnlyTrackSelected,reaper.GetTrack(0, reaper.CountTracks() - 1))
+          ttInsert()
+        elseif apply then
+          ttApply(track_template, sel_tr_count)
+        else
+          ttInsert()
+          if reaper.ValidatePtr2(0, m_obj, "MediaTrack*") then  
+            reaper.ReorderSelectedTracks(reaper.CSurf_TrackToID(m_obj, false)-1, 0)
+          end
+        end
+      reaper.PreventUIRefresh(-1)
+  elseif apply then
     ttApply(track_template, sel_tr_count)
   else
-    function ttInsert(temp_template)
-      if config.fx_hide then
-        local content = getContent(track_template)
-        content = fxWndHideChunk(content)
-        temp_template = scr.dir .. "temp.RTrackTemplate"
-        writeFile(temp_template, content)
-      end
-      reaper.Main_openProject(temp_template or track_template)
-      if config.fx_hide then os.remove(temp_template) end
-    end
     local t_temp = {}
     reaper.PreventUIRefresh(1)
     local f_depth = inFolderPrepare(sel_tr_count)
@@ -1568,11 +1606,10 @@ Additional keyboard shortcuts:
   F8: increase the maximum results number;
   F9: make GUI smaller;
   F10: make GUI larger;
-  ESC: close Quick Adder 2;
+  ESC: clear the search box or close Quick Adder 2;
   TAB: toggle Search Filter Tray visibility;
   ~: toggle the Keep Open mode;
   ]] .. mouse_mod[16]() .. [[ + W: show FX window toggle;
-  ]] .. mouse_mod[16]() .. [[ + Backspace: clear the search box;
   ]] .. mouse_mod[mouse_mod.alt]() .. [[ + ]] .. mouse_mod[mouse_mod.shift]() ..
   [[ + Up: move a favorite up;
   ]] .. mouse_mod[mouse_mod.alt]() .. [[ + ]] .. mouse_mod[mouse_mod.shift]() ..
@@ -1619,7 +1656,7 @@ function parseQuery()
    
    local i = 0
    
-   for word in data:gmatch("[%w%p]+") do
+   for word in data:gmatch("[^%s]+") do --"[%w%p]+"
      i = i + 1
   
      word = word:gsub("[\\\"\']", "\\%1")
@@ -1666,6 +1703,10 @@ gui.lists.mode = {"ALL", "CHAIN", "FAV", "FX", "JS", "TEMPLATE", "VST2", "VST3",
 gui.lists.db_scan = {"once per REAPER startup",
                      "on every Quick Adder launch",
                      "do not auto refresh"}
+gui.lists.no_sel_tracks = {"prompts to select tracks to put FX on",
+                           "adds FX to a new track",
+                           "does nothing"}
+
 gui.lists.mode = sortAbc(gui.lists.mode)
 for i, v in ipairs(gui.lists.mode) do
   if v == config.mode then
@@ -1735,6 +1776,11 @@ function gui:init()
     local wnd_y = config.wnd_y or (scr.vp_h - gui.wnd_h)/2
     gui.open = true
     gfx.init(scr.name, gui.wnd_w, gui.wnd_h, 0, wnd_x, wnd_y)
+    if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
+      local wnd = reaper.JS_Window_Find(scr.name, true)
+      reaper.JS_Window_AttachTopmostPin(wnd)
+      --reaper.JS_Window_SetLong(wnd, "STYLE", 2496135217)
+    end
   end
 
   if gui.reinit then
@@ -1749,11 +1795,13 @@ function gui:init()
   if gui.reopen then
     gui.reopen = nil
     local _, wnd_x, wnd_y = gfx.dock(-1, 0, 0, 0, 0)
-    --macAdjustGfxH()
     wnd_y = macYoffset(gui.wnd_h_save, gui.wnd_h, wnd_y)
     gui.wnd_h_save = nil
     gfx.quit()
     gfx.init(scr.name, gui.wnd_w, gui.wnd_h, 0, wnd_x, wnd_y)
+    if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
+      reaper.JS_Window_AttachTopmostPin(reaper.JS_Window_Find(scr.name, true))
+    end
   end
 end
 
@@ -2006,28 +2054,35 @@ function gui:isOver()
 end
 
 function gui:setCursor()
+  if gui.m_cap&mouse_mod.lmb == mouse_mod.lmb then return end
   if self.id and self.id:match("dragV") then
     if gui.m_cursor ~= "ns_arrow" then
       gfx.setcursor(32645) -- North-South arrow
       gui.m_cursor = "ns_arrow"
     end
-  else
+  elseif gui.m_cursor == "ns_arrow" or
+         self.cursor == "arrow" then
     if gui.m_cursor ~= "arrow" then
       gfx.setcursor(32512) -- arrow
       gui.m_cursor = "arrow"
     end
+  elseif self.id and self.txt_field then
+    if gui.m_cursor ~= "i_beam" then
+      gfx.setcursor(32513) -- I-beam
+      gui.m_cursor = "i_beam"
+    end
   end
 end
 
-function gui:hover()
+function gui:hover(special)
+  if self.hover_special and not special then return end
   if self:isOver() then
     gui.over = self.id
     self:setCursor()
     self:onSelect()
     self:onClick()
-    
-    return self
   end
+  return self
 end
 
 function _mouse()end
@@ -2038,7 +2093,7 @@ function gui:onClickSpecial()
     gui.active = self
     gui.active.m_cap = gui.m_cap 
   elseif gui.m_cap == 0 and gui.active and gui.active:isOver() then
-    gui.clicked = {id = gui.active.id, m_cap = gui.active.m_cap} 
+    gui.clicked = {id = gui.active.id, m_cap = gui.active.m_cap}
     gui.active = nil
   elseif gui.m_cap == 0 and gui.active and not gui.active:isOver() then
     gui.active = nil
@@ -2131,9 +2186,22 @@ function gui:onSelect()
     gui.active.m_cap = gui.m_cap
     gui.clicked = {id = self.id, m_cap = gui.m_cap, o = self}
     gui.selected = true
+    gui.m_x_click = gui.m_x
+    gui.m_y_click = gui.m_y
+    
+    if not _timers.double_click and not self.id:match("result") then
+      _timers.double_click = timer:new():start(config.dbl_click_speed)
+      double_clicked_id = gui.active.id
+    elseif _timers.double_click then
+      double_clicked = true
+      _timers.double_click = nil
+    end
+    
   elseif gui.m_cap == 0 and self.on_select and gui.selected then
       gui.active = nil
       gui.selected = nil
+      gui.m_x_click = nil
+      gui.m_y_click = nil
   elseif gui.m_cap == 0 and gui.selected and gui.focused and not gui.focused:isOver() then
     gui.selected = nil
   end
@@ -2150,7 +2218,6 @@ function gui:drawCbBox()
   if gui.active and gui.active.id == self.id or
      not gui.active and not gui.important and self.id == gui.over then
     fg_c = fg_c + (config.theme == "light" and 55 or 25)
-    --color(51,153,255) -- blue
   end
   color(fg_c)
   gfx.rect(self.x1, self.y1, self.w, self.h, 1) -- border
@@ -2369,8 +2436,8 @@ function gui:drawPin(state)
   end
 end
 
-function gui:drawTxt(str, shrink, change_w, change_h, pad_w, pad_h, measure_only)
-  color(self.font_c)
+function gui:drawTxt(str, shrink, change_w, change_h, pad_w, pad_h, measure_only, highlight)
+  color(highlight and 255 or self.font_c)
   str = self.upper and str:upper() or self.lower and str:lower() or
         self.cap and str:gsub("^%a", string.upper) or str
   gfx.x = self.x1 + math.floor((self.pad_x or 0) * config.multi)
@@ -2516,6 +2583,7 @@ function gui:bttnOver(r, g, b)
 end
 
 function gui:carriage(ch)
+  if gui.txt_hl then color(204,102,0) else color(self.font_c) end
   gfx.measurechar(ch) -- updates the carriage when no characters
   --color(0,120,215)
   if ch == ignore_ch.left or ch == ignore_ch.right then -- if left or right key
@@ -2542,10 +2610,10 @@ function gui:carriage(ch)
     end
 
     if gui.blink == 1 then
-      gfx.rect(gfx.x, gfx.y + self.pad_x * config.multi, 1 * config.multi, self.h - self.pad_x * config.multi * 2, 1)
+      gfx.rect(gfx.x, gfx.y + self.pad_x * config.multi, config.multi, self.h - self.pad_x * config.multi * 2, 1)
     end
   else
-    gfx.rect(gfx.x, gfx.y + self.pad_x * config.multi, 1 * config.multi, self.h - self.pad_x * config.multi * 2, 1)
+    gfx.rect(gfx.x, gfx.y + self.pad_x * config.multi, config.multi, self.h - self.pad_x * config.multi * 2, 1)
   end
 end
  
@@ -2564,7 +2632,7 @@ function isShorthand(str, mode)
   end
 end
 
-function gui:textBox(ch)
+function gui:textBox(ch, shrink)
   gfx.setfont(self.font)
   if gui.str == "" then gui.str_temp = "" end
   
@@ -2598,10 +2666,10 @@ function gui:textBox(ch)
     end
     
     if ch ~= white_ch.bs and gui.m_cap&mouse_mod.ctrl ~= mouse_mod.ctrl then -- if not backspace and not CTRL
-      if gui.b_count > 0 and valid_ch and str_w + ch_w < self.w - gui.Row2.Search.Clear.w then -- if string is split
+      if gui.b_count > 0 and valid_ch and str_w + ch_w < self.w - (shrink or 0) then -- if string is split
         gui.str_a = gui.str_a .. string.char(ch)
         gui.str = gui.str_a .. gui.str_b
-      elseif valid_ch and str_w + ch_w < self.w - gui.Row2.Search.Clear.w then
+      elseif valid_ch and str_w + ch_w < self.w - (shrink or 0) then
         gui.str = gui.str .. string.char(ch)
         scr.match_found = nil
         
@@ -2609,7 +2677,7 @@ function gui:textBox(ch)
           _timers.search_suspend = timer:new():start(config.search_delay)
         end
       end  
-    elseif gui.m_cap == 0 then -- if backspace
+    elseif gui.m_cap == 0 and not gui.txt_hl then -- if backspace
       scr.match_found = nil
       if gui.b_count == 0 then -- if string is not split
         gui.str = gui.str:sub(0, gui.str:len() - 1)
@@ -2623,7 +2691,12 @@ function gui:textBox(ch)
       end
     end
     
-    if gui.b_count > 0 and ch == white_ch.del then -- if delete
+    if gui.str_hl and gui.str_hl == gui.str and (ch == white_ch.del or ch == white_ch.bs) then
+      gui.txt_hl = nil
+      gui.str_hl = nil
+      gui.str = ""
+      gui.b_count = 0
+    elseif gui.b_count > 0 and ch == white_ch.del then -- if delete
       gui.str_b = gui.str_b:sub(2)
       gui.b_count = gui.b_count - 1
       gui.str = gui.str_a .. gui.str_b
@@ -2647,12 +2720,30 @@ function gui:textBox(ch)
   if gui.b_count and gui.b_count > 0 or gui.b_count == 0 and gui.str_b ~= "" then -- split the string
     gui.str_a = gui.str:sub(0, gui.str:len() - gui.b_count)
     gui.str_b = gui.str:sub(gui.str:len() + 1 - gui.b_count)
-    gui.str_car = gui.str:sub(gui.str:len() + 1 - gui.b_count) -- carriage string
+    --gui.str_car = gui.str:sub(gui.str:len() + 1 - gui.b_count) -- carriage string
   elseif gui.b_count == 0 and ch == white_ch.del then
-    gui.str_car = gui.str:sub(gui.str:len() + 1 - gui.b_count) -- carriage correct
+    --gui.str_car = gui.str:sub(gui.str:len() + 1 - gui.b_count) -- carriage correct
   end
   
-  self:drawTxt(gui.str)
+  --[[if double_clicked and gui.over == double_clicked_id and
+     gui.over == self.id and gui.str ~= "" then
+    gui.txt_hl = true
+    gui.str_hl = gui.str
+    gui.b_count = 0
+  elseif gui.clicked and gui.txt_hl then
+    gui.txt_hl = nil
+    gui.str_hl = nil
+  end
+   
+  if gui.txt_hl then
+    color(51,153,255)
+    gfx.rect(self.x1+self.pad_x*config.multi,
+             self.y1 + self.pad_x * config.multi,
+             gfx.measurestr(gui.str)+config.multi,
+             self.h - self.pad_x * config.multi * 2, 1)
+  end]]
+ 
+  self:drawTxt(gui.str, _, _, _, _, _, _, gui.txt_hl)
    
   if gui.str:len() == 0 or ch == ignore_ch.end_key  then -- calculate the split
     gui.b_count = 0
@@ -2660,26 +2751,42 @@ function gui:textBox(ch)
     gui.b_count = gui.str:len()
   elseif ch == ignore_ch.left and gui.b_count < gui.str:len() then -- if left arrow key
     gui.b_count = gui.b_count + 1
-  elseif ch == ignore_ch.right and gui.str_car and gui.str_car:len() > 0 then -- if right arrow key
+  elseif ch == ignore_ch.right and gui.str_b:len() > 0 then -- if right arrow key
     gui.b_count = gui.b_count - 1
   end
   
-  
-  gfx.x = gfx.x - gfx.measurestr(gui.str_car)
+  gui.str_x2 = gfx.x
+
+  gfx.x = gfx.x - gfx.measurestr(gui.str_b)
+
+  if gui.clicked and gui.clicked.id == self.id and not gui.txt_hl then
+    if gui.str_x2 - gfx.measurestr(gui.str:match(".+(.)"))/2 <= gfx.mouse_x and
+       #gui.str > 1 then
+      gui.b_count = 0
+      carriage_suspend = true
+      _timers.carriage_suspend = timer:new():start(0.5)
+    else
+      local str = gui.str
+      for i = 1, #gui.str + 1 do
+        local str_a = gfx.measurestr(str:match("(.+).") or "")
+        local str_b = gfx.measurestr(str:match(".+(.)") or gui.str:match("."))
+        if gfx.mouse_x >= gui.str_x2 - (gfx.measurestr(gui.str) - str_a - str_b/2) or
+           i == #gui.str + 1 then
+          gui.b_count = i - 1
+          carriage_suspend = true
+          _timers.carriage_suspend = timer:new():start(0.5)
+          break
+        else
+          str = str:match("(.+).") or gui.str:match(".")
+        end
+      end
+    end
+  end
   
   if gui.focus == 2 then
     self:carriage(ch)
   else
     gui.blink = 0
-  end
-  
-  if gui.str == "" then
-    self.font_c = self.font_c + (config.theme == "light" and 100 or -100)
-    self.pad_x = self.pad_x + 3
-    self.pad_y = 1 * math.floor(config.multi)
-    self.txt_align = gui.txt_align["vert"]
-    self.font = 5
-    self:drawTxt("Search " .. gui.hints[config.mode])
   end
   
   ::SKIP::
@@ -2859,6 +2966,16 @@ scr.actions.scanSet = function(val)
     end
   end
 end
+
+scr.actions.noSelTracks = function(val)
+  for i = 1, #gui.lists.no_sel_tracks do
+    if gui.lists.no_sel_tracks[i] == val then
+      config.no_sel_tracks = i
+      break
+    end
+  end
+end
+
 
 scr.actions.refreshDb = function()
   db.saved = false
@@ -3194,7 +3311,7 @@ gui.hints.generate = function(id)
     return
   end
   
-  if gui.view == "main" and #scr.results_list > 0 then
+  if gui.view == "main" and #scr.results_list > 0 and gui.Results.sel then
     if gui.m_cap&mouse_mod.alt == mouse_mod.alt and
        gui.m_cap&mouse_mod.shift == mouse_mod.shift then
        gui.hints_txt = "Move the favorite up or down " ..
@@ -3288,7 +3405,7 @@ gui.hints.generate = function(id)
       gui.hints_txt = (id:match("_s") and "Remove the result from favorites" or
                        "Add the result to favorites") .. " [" .. mouse_mod[16]() .. " + F]"
     elseif id == "clear" and gui.str ~= "" then
-      gui.hints_txt = "Clear search query [" .. mouse_mod[mouse_mod.alt]() .. " + Backspace]"
+      gui.hints_txt = "Clear search query [Esc]"
     elseif gui.over ~= "view_main" then
       gui.hints_txt = "Press F1 for the help file" --"Search " .. gui.hints[config.mode]
     end
@@ -3362,7 +3479,7 @@ function mainView()
   
   gui.hints.generate(gui.over)
 
-  gui.Row1 = gui:setChild({id = "row1", h = math.floor(gui.row_h * 0.5)}, true)
+  gui.Row1 = gui:setChild({id = "row1", h = math.floor(gui.row_h * 0.5), cursor = "arrow"}, true)
   gui.Row1.Reminder = gui.Row1:setChild{id = "reminder", bttn = true, on_select = true, w = gui.Row1.h,
                       x1 = config.reminder and gui.border + gui.Row1.w - gui.Row1.h or gui.Row1.x2}
   gui.Row1.Prefs = gui.Row1:setChild{id = "view_prefs", bttn = true,
@@ -3384,7 +3501,7 @@ function mainView()
   gui.Row2 = gui:setChild({id = "row2", h = gui.row_h, float_b = gui.Row1}, true)
    
   gui.Row2.dd_Mode = gui.Row2:setChild{
-                                  id = "dd_1_mode",
+                                  id = "dd_1_mode", cursor = "arrow",
                                   w = gui.Row2.h - 4 * math.floor(config.multi),
                                   h = gui.Row2.h - 4 * math.floor(config.multi),
                                   x1 = gui.Row2.x1 + 2 * math.floor(config.multi),
@@ -3395,7 +3512,8 @@ function mainView()
                                   separator = gui.border,
                                   table = gui.lists.mode, table_name = "mode"}
                                   
-  gui.Row2.Search = gui.Row2:setChild{id = "search", float_r_auto_w = gui.Row2.dd_Mode, auto_w = true}
+  gui.Row2.Search = gui.Row2:setChild{id = "search", txt_field = true, hover_special = true,
+                                      float_r_auto_w = gui.Row2.dd_Mode, auto_w = true}
  
   if config.reminder and gui.reminder_seen and not gui.focused then config.reminder = false end
   if config.reminder then
@@ -3437,7 +3555,8 @@ function mainView()
            2 * math.floor(config.multi), 1)
  
   gui.Row2.Search.Clear = gui.Row2.Search:setChild{id = "clear", w = config.row_h * config.multi,
-                                                   x1 = gui.Row2.Search.x2 - config.row_h * config.multi}
+                                                   x1 = gui.Row2.Search.x2 - config.row_h * config.multi,
+                                                   cursor = "arrow"}
   gui.Row2.Search.Clear:setStyle("search_txt")
   gui.Row2.Search.Clear.txt_align = gui.txt_align["center"]
   gui.Row2.Search.Clear.pad_x = config.multi < 2 and 1 or 0
@@ -3451,15 +3570,22 @@ function mainView()
                                 config.multi > 2 and -7
   if gui.str ~= "" then
     gui.Row2.Search.Clear.bttn = true
-    gui.Row2.Search.Clear:drawRect():drawTxt("✕"):hover()
+    gui.Row2.Search.Clear.on_select = true
+    gui.Row2.Search.Clear:hover(true):drawRect():drawTxt("✕")
+    gui.Row2.Search.x2 = gui.Row2.Search.x2 - gui.Row2.Search.Clear.w
   end
+  
+  gui.Row2.Search.on_select = true
+  gui.Row2.Search:hover(true)
   
   for i = 1, gui.result_rows do
 
     if i == 1 then
-      gui.Results[i] = gui:setChild({id = "result_row_" .. i, h = gui.row_h, float_b = gui.Row2}, true)
+      gui.Results[i] = gui:setChild({id = "result_row_" .. i, h = gui.row_h, cursor = "arrow",
+                                     float_b = gui.Row2}, true)
     else
-      gui.Results[i] = gui:setChild({id = "result_row_" .. i, h = gui.row_h, float_b = gui.Results[i-1]}, true)
+      gui.Results[i] = gui:setChild({id = "result_row_" .. i, h = gui.row_h, cursor = "arrow",
+                                     float_b = gui.Results[i-1]}, true)
     end
     local fav_s = select(4, gui.parseResult(scr.results_list[i]))
     fav_s = fav_s ~= "" and "_s" or ""
@@ -3556,7 +3682,15 @@ function mainView()
     gui.Results[i].result:drawTxt(name2)
   end
   
-  gui.Row2.Search:textBox(gui.ch)
+  gui.Row2.Search:textBox(gui.ch, gui.Row2.Search.Clear.w)
+  if gui.str == "" then
+    gui.Row2.Search.font_c = gui.Row2.Search.font_c + (config.theme == "light" and 100 or -100)
+    gui.Row2.Search.pad_x = gui.Row2.Search.pad_x + 3
+    gui.Row2.Search.pad_y = 1 * math.floor(config.multi)
+    gui.Row2.Search.txt_align = gui.txt_align["vert"]
+    gui.Row2.Search.font = 5
+    gui.Row2.Search:drawTxt("Search " .. gui.hints[config.mode])
+  end
   gui.init() 
   gui.ch = gfx.getchar()
 end
@@ -3733,7 +3867,7 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_2 = gui.Prefs.Body:setChild({id = "section_2", h = (57 + padding) * config.multi,
                              float_b = gui.Prefs.Body.Section_1}, true, true, padding, padding * 1.5, true)
                              
-    gui.Prefs.Body.Section_3 = gui.Prefs.Body:setChild({id = "Section_3", h = (83 + padding) * config.multi,
+    gui.Prefs.Body.Section_3 = gui.Prefs.Body:setChild({id = "Section_3", h = (112 + padding) * config.multi,
                              float_b = gui.Prefs.Body.Section_2}, true, true, padding, padding * 1.5, true)
     
     
@@ -3762,7 +3896,7 @@ gui.prefs_page = function(page)
                                                                        :setStyle("prefs"):drawTitle()
                              
     gui.Prefs.Body.Section_3.Title = gui.Prefs.Body.Section_3:setChild{id = "", x1 = gui.Prefs.Body.Section_3.x1 + 5 * config.multi,
-                                                                       txt = "Search options",
+                                                                       txt = "Search and insertion options",
                                                                        y1 = gui.Prefs.Body.Section_3.y1 - 10 * config.multi}
                                                                        :setStyle("prefs"):drawTitle()
 
@@ -3903,60 +4037,52 @@ gui.prefs_page = function(page)
       gui.Prefs.Body.Section_2.Add_type:setStyle("search"):drawRect():drawTxt("+")
     end
        
-    do -- DEFAULT MODE
+    -- DEFAULT MODE
 
-      gui.Prefs.Body.Section_3.Default_mode = gui.Prefs.Body.Section_1.Caption:setChild({
-                                               float_b = gui.Prefs.Body.Section_3.Title,
-                                               },
-                                               nil, nil, padding)
-      gui.Prefs.Body.Section_3.Default_mode.txt_align = gui.txt_align["vert"]
-      gui.Prefs.Body.Section_3.Default_mode:setStyle("search"):drawTxt("Default filter:", nil, true)
-      local name
-      for k, v in pairs(res_multi) do
-        if v == config.multi then
-          name = k
-          break
-        end
-      end
-       
-      gui.Prefs.Body.Section_3["dd_1"] = gui.Prefs.Body.Section_1.dd:setChild({
-                                            id = "dd_1_"..(config.default_mode or "LAST USED"),
-                                            w = 80 * config.multi,
-                                            on_select = true, bttn = true,
-                                            table = gui.lists.mode, table_name = "mode",
-                                            action = "defMode",
-                                            extra_field = "LAST USED",
-                                            direction = "float_t",
-                                            --y_reset = (gui.wnd_h - gui.Prefs.Body.Section_1.dd.h *
-                                            --(#mode + 1)) / 2 ,
-                                            float_b = gui.Prefs.Body.Section_3.Title,
-                                            float_r = gui.Prefs.Body.Section_3.Default_mode},
-                                            nil, nil, padding)
-    
-      gui.Prefs.Body.Section_3["dd_1"]:drawDdMenu(1, config.default_mode or "LAST USED", true)
-    end 
-    
-    do -- RESULT ROWS
+    gui.Prefs.Body.Section_3.Default_mode = gui.Prefs.Body.Section_1.Caption:setChild({
+                                             float_b = gui.Prefs.Body.Section_3.Title,
+                                             },
+                                             nil, nil, padding)
+    gui.Prefs.Body.Section_3.Default_mode.txt_align = gui.txt_align["vert"]
+    gui.Prefs.Body.Section_3.Default_mode:setStyle("search"):drawTxt("Default filter:", nil, true)
 
-
-      gui.Prefs.Body.Section_3.Result_rows = gui.Prefs.Body.Section_1.Caption:setChild({
-                                               float_b = gui.Prefs.Body.Section_3.Title,
-                                               float_r = gui.Prefs.Body.Section_3["dd_1"]
-                                               }, nil, nil, padding * 2, padding)
-      gui.Prefs.Body.Section_3.Result_rows.txt_align = gui.txt_align["vert"]
-      gui.Prefs.Body.Section_3.Result_rows:setStyle("search"):drawTxt("Result rows:", nil, true)
-      gui.Prefs.Body.Section_3.Results_max = gui.Prefs.Body.Section_3:setChild({
-                                          id = "dragV_results_max", bttn = true, drag_v = true,
-                                          table = config, ts_floor = 0, ts_ceil = 15, font = 14,
-                                          w = gui.Prefs.Body.Section_1.dd.h,
-                                          h = gui.Prefs.Body.Section_1.dd.h,
-                                          --pad_y = os_is.mac and 0 or 1 * config.multi,
+    gui.Prefs.Body.Section_3["dd_1"] = gui.Prefs.Body.Section_1.dd:setChild({
+                                          id = "dd_1_"..(config.default_mode or "LAST USED"),
+                                          w = 80 * config.multi,
+                                          on_select = true, bttn = true,
+                                          table = gui.lists.mode, table_name = "mode",
+                                          action = "defMode",
+                                          extra_field = "LAST USED",
+                                          direction = "float_t",
+                                          --y_reset = (gui.wnd_h - gui.Prefs.Body.Section_1.dd.h *
+                                          --(#mode + 1)) / 2 ,
                                           float_b = gui.Prefs.Body.Section_3.Title,
-                                          float_r = gui.Prefs.Body.Section_3.Result_rows}, nil, nil, padding)
-      gui.Prefs.Body.Section_3.Results_max:setStyle("dd"):drawRect()
-      gui.Prefs.Body.Section_3.Results_max.c = gui.Prefs.Body.Section_3.Results_max.c - 52
-      gui.Prefs.Body.Section_3.Results_max:drawBorder():drawTxt(config.results_max)
-    end
+                                          float_r = gui.Prefs.Body.Section_3.Default_mode},
+                                          nil, nil, padding)
+  
+    gui.Prefs.Body.Section_3["dd_1"]:drawDdMenu(1, config.default_mode or "LAST USED", true)
+     
+    -- RESULT ROWS
+
+    gui.Prefs.Body.Section_3.Result_rows = gui.Prefs.Body.Section_1.Caption:setChild({
+                                             float_b = gui.Prefs.Body.Section_3.Title,
+                                             float_r = gui.Prefs.Body.Section_3["dd_1"]
+                                             }, nil, nil, padding * 2, padding)
+    gui.Prefs.Body.Section_3.Result_rows.txt_align = gui.txt_align["vert"]
+    gui.Prefs.Body.Section_3.Result_rows:setStyle("search"):drawTxt("Result rows:", nil, true)
+    gui.Prefs.Body.Section_3.Results_max = gui.Prefs.Body.Section_3:setChild({
+                                        id = "dragV_results_max", bttn = true, drag_v = true,
+                                        table = config, ts_floor = 0, ts_ceil = 15, font = 14,
+                                        w = gui.Prefs.Body.Section_1.dd.h,
+                                        h = gui.Prefs.Body.Section_1.dd.h,
+                                        --pad_y = os_is.mac and 0 or 1 * config.multi,
+                                        float_b = gui.Prefs.Body.Section_3.Title,
+                                        float_r = gui.Prefs.Body.Section_3.Result_rows}, nil, nil, padding)
+    gui.Prefs.Body.Section_3.Results_max:setStyle("dd"):drawRect()
+    gui.Prefs.Body.Section_3.Results_max.c = gui.Prefs.Body.Section_3.Results_max.c - 52
+    gui.Prefs.Body.Section_3.Results_max:drawBorder():drawTxt(config.results_max)
+
+    -- SHOW FAVORITES
     
     gui.Prefs.Body.Section_3.Cb_1 = gui.Prefs.Body.Section_1.Cb:setChild({
                                          id = "cb_fav_persist",
@@ -3967,6 +4093,8 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_3.Cb_1:drawRect():setStyle("search")
     gui.Prefs.Body.Section_3.Cb_1:drawCb("Always show favorites")
     
+    -- CLEAR SEARCH
+    
     gui.Prefs.Body.Section_3.Cb_2 = gui.Prefs.Body.Section_1.Cb:setChild({
                                          id = "cb_clear_search",
                                          float_b = gui.Prefs.Body.Section_3.Default_mode,
@@ -3975,48 +4103,72 @@ gui.prefs_page = function(page)
       
     gui.Prefs.Body.Section_3.Cb_2:drawRect():setStyle("search")
     gui.Prefs.Body.Section_3.Cb_2:drawCb("Clear search box after insertion")
+   
+    -- WHEN NO TRACK SELECTED
     
+    gui.Prefs.Body.Section_3.No_sel_tracks = gui.Prefs.Body.Section_1.Caption:setChild({
+                                             float_b = gui.Prefs.Body.Section_3.Cb_1,
+                                             },
+                                             nil, nil, padding)
+    gui.Prefs.Body.Section_3.No_sel_tracks.txt_align = gui.txt_align["vert"]
+    gui.Prefs.Body.Section_3.No_sel_tracks:setStyle("search")
+    :drawTxt("If no tracks selected, " .. enter .. ":", nil, true)
     
-    do -- DATABASE REFRESH OPTIONS
+    gui.Prefs.Body.Section_3["dd_2"] = gui.Prefs.Body.Section_1.dd:setChild({
+                                          id = "dd_1_no_sel_tracks",
+                                          w = 205 * config.multi, cap = true,
+                                          on_select = true, bttn = true,
+                                          table = gui.lists.no_sel_tracks, table_name = "no_sel_tracks",
+                                          action = "noSelTracks",
+                                          direction = "float_b",
+                                          --y_reset = (gui.wnd_h - gui.Prefs.Body.Section_1.dd.h *
+                                          --(#mode + 1)) / 2 ,
+                                          float_b = gui.Prefs.Body.Section_3.Cb_1,
+                                          float_r = gui.Prefs.Body.Section_3.No_sel_tracks},
+                                          nil, nil, padding)
     
-      gui.Prefs.Body.Section_4.Db_Refresh = gui.Prefs.Body.Section_1.Caption:setChild({
-                                               float_b = gui.Prefs.Body.Section_4.Title,
-                                               --float_r = gui.Prefs.Body.Section_3["dd_1"],
-                                               }, nil, nil, padding)
+    gui.Prefs.Body.Section_3["dd_2"]:drawDdMenu(1, config.no_sel_tracks, true)
     
-      gui.Prefs.Body.Section_4.Db_Refresh.txt_align = gui.txt_align["vert"]
-      gui.Prefs.Body.Section_4.Db_Refresh:setStyle("search"):drawTxt("Auto refresh:", nil, true)
-      gui.Prefs.Body.Section_4:setStyle("dd")
-      
+    -- DATABASE REFRESH OPTIONS
+  
+    gui.Prefs.Body.Section_4.Db_Refresh = gui.Prefs.Body.Section_1.Caption:setChild({
+                                             float_b = gui.Prefs.Body.Section_4.Title,
+                                             --float_r = gui.Prefs.Body.Section_3["dd_1"],
+                                             }, nil, nil, padding)
+  
+    gui.Prefs.Body.Section_4.Db_Refresh.txt_align = gui.txt_align["vert"]
+    gui.Prefs.Body.Section_4.Db_Refresh:setStyle("search"):drawTxt("Auto refresh:", nil, true)
+    gui.Prefs.Body.Section_4:setStyle("dd")
+    
 
+  
+  
+    gui.Prefs.Body.Section_4["dd_1"] = gui.Prefs.Body.Section_1.dd:setChild({
+                                          w = 165 * config.multi,
+                                          id = "dd_1_db_scan",
+                                          on_select = true, bttn = true,
+                                          table = gui.lists.db_scan, table_name = "db_scan",
+                                          action = "scanSet",
+                                          direction = "float_t", cap = true,
+                                          float_b = gui.Prefs.Body.Section_4.Title,
+                                          float_r = gui.Prefs.Body.Section_4.Db_Refresh},
+                                          nil, nil, padding)
+  
+    gui.Prefs.Body.Section_4["dd_1"]:drawDdMenu(1, config.db_scan, true)
     
-    
-      gui.Prefs.Body.Section_4["dd_1"] = gui.Prefs.Body.Section_1.dd:setChild({
-                                            w = 165 * config.multi,
-                                            id = "dd_1_db_scan",
-                                            on_select = true, bttn = true,
-                                            table = gui.lists.db_scan, table_name = "db_scan",
-                                            action = "scanSet",
-                                            direction = "float_t", cap = true,
+    gui.Prefs.Body.Section_4.Refresh_bttn = gui.Prefs.Body.Section_4:setChild({font = 14,
+                                            w = 100 * config.multi, bttn = true,
+                                            h = gui.Prefs.Nav.h, id = "refreshDb",
+                                            --pad_y = os_is.mac and 0 or 1 * config.multi,
                                             float_b = gui.Prefs.Body.Section_4.Title,
-                                            float_r = gui.Prefs.Body.Section_4.Db_Refresh},
-                                            nil, nil, padding)
+                                            float_r = gui.Prefs.Body.Section_4["dd_1"]},
+                                            nil, nil, padding * 2, padding)
     
-      gui.Prefs.Body.Section_4["dd_1"]:drawDdMenu(1, gui.lists.db_scan[config.db_scan], true)
-      
-      gui.Prefs.Body.Section_4.Refresh_bttn = gui.Prefs.Body.Section_4:setChild({font = 14,
-                                              w = 100 * config.multi, bttn = true,
-                                              h = gui.Prefs.Nav.h, id = "refreshDb",
-                                              --pad_y = os_is.mac and 0 or 1 * config.multi,
-                                              float_b = gui.Prefs.Body.Section_4.Title,
-                                              float_r = gui.Prefs.Body.Section_4["dd_1"]},
-                                              nil, nil, padding * 2, padding)
-      
-        gui.Prefs.Body.Section_4.Refresh_bttn:drawRect()
-        gui.Prefs.Body.Section_4.Refresh_bttn.c = gui.Prefs.Body.Section_4.Refresh_bttn.c - 52
-        gui.Prefs.Body.Section_4.Refresh_bttn:drawBorder():drawTxt(get_db and "Refreshing... " or "Force Refresh")
+    gui.Prefs.Body.Section_4.Refresh_bttn:drawRect()
+    gui.Prefs.Body.Section_4.Refresh_bttn.c = gui.Prefs.Body.Section_4.Refresh_bttn.c - 52
+    gui.Prefs.Body.Section_4.Refresh_bttn:drawBorder():drawTxt(get_db and "Refreshing... " or "Force Refresh")
         
-    end
+    
     
   elseif page == "nav_templates" then
     gui.Prefs.Body.Section_1 = gui.Prefs.Body:setChild({id = "section_1", h = (114 + padding) * config.multi,
@@ -4079,8 +4231,8 @@ gui.prefs_page = function(page)
                                          }, nil, nil, padding, padding)
       
     gui.Prefs.Body.Section_2.Cb_1:drawRect():setStyle("search")
-    gui.Prefs.Body.Section_2.Cb_1:drawCb("\"Enter\" applies / \"" .. mouse_mod[mouse_mod.clear]() ..
-                                              " + " .. enter .. "\" adds track templates")
+    gui.Prefs.Body.Section_2.Cb_1:drawCb(enter .. " applies / " .. mouse_mod[mouse_mod.clear]() ..
+                                              " + " .. enter .. " adds track templates")
     
     gui.Prefs.Body.Section_1.x1 = gui.Prefs.Body.Section_1.x1 - math.floor(config.multi)
     gui.Prefs.Body.Section_2.x1 = gui.Prefs.Body.Section_2.x1 - math.floor(config.multi)
@@ -4223,8 +4375,46 @@ function prefsView()
   gui:init()
 end
 
-function _main()end
+function getMobj()
+  if gui.m_cap&mouse_mod.lmb == 1 and gui.active and gui.active.id:match("^result") then --and
+    if gui.m_x_click ~= gui.m_x or gui.m_y_click ~= gui.m_y then
+      if reaper.JS_Mouse_LoadCursor then
+        if m_obj then 
+          if gui.m_cursor ~= "dragdrop" then
+            local cur = reaper.JS_Mouse_LoadCursor(182)
+            reaper.JS_Mouse_SetCursor(cur)
+            gui.m_cursor = "dragdrop"
+          end
+        else
+          if gui.m_cursor ~= "cantdrop" then
+            local cur = reaper.JS_Mouse_LoadCursor(32648)
+            reaper.JS_Mouse_SetCursor(cur)
+            gui.m_cursor = "cantdrop"
+          end
+        end
+      end
+    end
+    local dest, segment
+    if reaper.BR_GetMouseCursorContext then
+      dest, segment = reaper.BR_GetMouseCursorContext()
+    end
+    if segment == "empty" then m_obj = "new_track" goto SKIP end
+    local x, y = reaper.GetMousePosition()
+    local tk = select(2, reaper.GetItemFromPoint(x, y, true))
+    if tk then
+      m_obj = tk
+    else
+      local tr = reaper.GetTrackFromPoint(x, y)
+      if tr then m_obj = tr elseif segment ~= "track" then m_obj = nil end
+    end
+    ::SKIP::
+  elseif gui.m_drag_x then
+    gui.m_drag_x = nil
+    gui.m_drag_y = nil
+  end
+end
 
+function _main()end
 function main()
   if reaper.GetExtState("Quick Adder", "MSG") == "reopen" then
     reaper.SetExtState("Quick Adder", "MSG", 1, false)
@@ -4244,9 +4434,11 @@ function main()
   gui.m_cap = gfx.mouse_cap
   gui.m_x = gfx.mouse_x
   gui.m_y = os_is.mac and gfx.mouse_y - 1 or gfx.mouse_y
+
+  getMobj()
   
-  inBounds()  
-  
+  inBounds()
+
   if gui.m_x_i ~= gui.m_x or gui.m_y_i ~= gui.m_y or gui.m_cap_i ~= gui.m_cap then
     gui.m_x_i = gui.m_x
     gui.m_y_i = gui.m_y
@@ -4294,16 +4486,16 @@ function main()
            gui.str == "" and #scr.results_list == 0 and #db.FAV > 0
            or scr.re_search) then
       scr.actions.clear(_, true, gui.Results.sel <= config.results_max and gui.Results.sel or
-                                 config.results_max)
+                                 config.results_max > 0 and config.results_max or 1)
       scr.re_search = nil
-      doMatch()  
+      if config.results_max > 0 then doMatch() end  
     end
   end
 
   if (gui.ch == ignore_ch.enter and not gui.dd_items or
-      double_clicked and gui.over == double_clicked_id and gui.over:match("result")) and
+      double_clicked and gui.over == double_clicked_id and gui.over:match("result") or
+      m_obj and gui.m_cap&mouse_mod.lmb == 0) and
       scr.match_found then
-
     if not config.pin then
       scr.over = true
       gfx.quit()
@@ -4315,11 +4507,12 @@ function main()
  
     if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
       gui.reopen = true gui:init()
+      
     else
       reaper.atexit(exit_states)
     end
   end
- 
+   
   if double_clicked then
     double_clicked = nil
   end
