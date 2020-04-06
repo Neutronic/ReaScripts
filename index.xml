@@ -162,7 +162,9 @@
 + ability to pin Quick Adder
 + place text box carriage with mouse cursor
 
-NOTE: some new functionality requires SWS and/or JS APIs.]]></changelog>
+NOTE: some new functionality requires SWS and/or JS APIs.
+
+]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/481dbb65e34a67c6cacc4866acabf157682b4bfe/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
