@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="6830de48347598230581461a6cbb4b4a164021c7">
+<index version="1" name="Neutronic Scripts" commit="74e3a06b574113afaf5c3f7dd9fad8ea07bc4e12">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -153,6 +153,17 @@
 # improved "FX not found" warning
 # updated help file]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/6830de48347598230581461a6cbb4b4a164021c7/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.10" author="Neutronic" time="2020-04-06T21:05:41Z">
+        <changelog><![CDATA[+ drag and drop support
++ dropping an effect on empty TCP/MCP automatically
+  creates a named track with the effect on it
++ options for "no track selected" scenario
++ ability to pin Quick Adder
++ place text box carriage with mouse cursor
+
+NOTE: some new functionality requires SWS and/or JS APIs.]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/74e3a06b574113afaf5c3f7dd9fad8ea07bc4e12/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
