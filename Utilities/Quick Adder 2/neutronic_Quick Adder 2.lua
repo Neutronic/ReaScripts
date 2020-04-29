@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + script docking support
+  + support script docking with the title bar menu option (Windows only)
   
   New in v2.15:
   + search and run actions
