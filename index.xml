@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="326ebc6738ac1725e536a23b213546336b04741e">
+<index version="1" name="Neutronic Scripts" commit="d8cbac535257d8bc8343b1d75a4fcf361c503f1a">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -182,6 +182,7 @@ NOTE: some new functionality requires SWS and/or JS APIs.
       </version>
       <version name="2.16" author="Neutronic" time="2020-04-29T03:30:40Z">
         <changelog><![CDATA[+ support script docking with the title bar menu option (Windows only)
+# check JS names for double quotes
 
 New in v2.15:
 + search and run actions
@@ -194,7 +195,7 @@ New in v2.15:
 + notify user if there is no SWS and/or JS API installed
 # enhanced exact matching logic
 # enhanced FX filter string parsing]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/326ebc6738ac1725e536a23b213546336b04741e/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/d8cbac535257d8bc8343b1d75a4fcf361c503f1a/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
