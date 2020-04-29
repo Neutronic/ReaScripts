@@ -11,6 +11,7 @@ Links:
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
   + support script docking with the title bar menu option (Windows only)
+  # check JS names for double quotes
   
   New in v2.15:
   + search and run actions
@@ -1211,6 +1212,7 @@ function getJs()
 
     if js_name then
       local path = file_list[i]:gsub(".+/Effects/", "")
+      js_name = js_name:gsub("\"", "\\%0")
       
       if rpr.def_fx_filt and fxExclCheck("js:" .. js_name:lower()) then goto SKIP end
       if rpr.def_fx_filt and not fxExclCheck("js:" .. js_name:lower(), true) then goto SKIP end
@@ -1881,6 +1883,12 @@ function gui:init()
     local wnd_y = config.wnd_y or (scr.vp_h - gui.wnd_h)/2
     gui.open = true
     gfx.init(scr.name, gui.wnd_w, gui.wnd_h, config.dock or 0, wnd_x, wnd_y)
+    
+    if gfx.getchar(65536)&2 ~= 2 and reaper.JS_Window_SetFocus then
+      local wnd = reaper.JS_Window_Find(scr.name, true)
+      reaper.JS_Window_SetFocus(wnd)
+    end
+      
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
       local wnd = reaper.JS_Window_Find(scr.name, true)
       reaper.JS_Window_AttachTopmostPin(wnd)
