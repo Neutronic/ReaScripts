@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.15
+Version: 2.16
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,6 +10,9 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
+  + script docking support
+  
+  New in v2.15:
   + search and run actions
   + add actions to favorites
   + new filter to search actions only
@@ -879,7 +882,8 @@ end
 function waitResult()
   if wait_result then
     wait_result = nil
-    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
+    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) and
+       gfx.dock(-1) == 0 then
       gui.reopen = true gui:init()
     end
   end
@@ -1876,7 +1880,7 @@ function gui:init()
     local wnd_x = config.wnd_x or (scr.vp_w - gui.wnd_w)/2 - 8
     local wnd_y = config.wnd_y or (scr.vp_h - gui.wnd_h)/2
     gui.open = true
-    gfx.init(scr.name, gui.wnd_w, gui.wnd_h, 0, wnd_x, wnd_y)
+    gfx.init(scr.name, gui.wnd_w, gui.wnd_h, config.dock or 0, wnd_x, wnd_y)
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
       local wnd = reaper.JS_Window_Find(scr.name, true)
       reaper.JS_Window_AttachTopmostPin(wnd)
@@ -1890,7 +1894,7 @@ function gui:init()
     macAdjustGfxH()
     wnd_y = macYoffset(gui.wnd_h_save, gui.wnd_h, wnd_y)
     gui.wnd_h_save = nil
-    gfx.init("", gui.wnd_w, gui.wnd_h, 0, wnd_x, wnd_y)
+    gfx.init("", gui.wnd_w, gui.wnd_h, config.dock or 0, wnd_x, wnd_y)
   end
   
   if gui.reopen then
@@ -1899,7 +1903,7 @@ function gui:init()
     wnd_y = macYoffset(gui.wnd_h_save, gui.wnd_h, wnd_y)
     gui.wnd_h_save = nil
     gfx.quit()
-    gfx.init(scr.name, gui.wnd_w, gui.wnd_h, 0, wnd_x, wnd_y)
+    gfx.init(scr.name, gui.wnd_w, gui.wnd_h, config.dock or 0, wnd_x, wnd_y)
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
       reaper.JS_Window_AttachTopmostPin(reaper.JS_Window_Find(scr.name, true))
     end
@@ -4716,8 +4720,10 @@ function main()
     gui.reopen = true
   end
   
-  if gfx.dock(-1, 0, 0, 0, 0) ~= 0 then -- forbids docking
-    gui.reopen = true
+  if gfx.dock(-1) ~= 0 then -- set docking
+    config.dock = gfx.dock(-1)
+  elseif gui.open then
+    config.dock = nil
   end
    
   gui.bg_hue = config.theme == "light" and 50 or 30
@@ -4802,7 +4808,8 @@ function main()
     
     if config.clear_search then scr.actions.clear() end
  
-    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) then
+    if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) and
+       gfx.dock(-1) == 0 then
       if not scr.result_is_action then
         gui.reopen = true gui:init()
       else
