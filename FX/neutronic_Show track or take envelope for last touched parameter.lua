@@ -1,14 +1,14 @@
 --[[
 Description: Show track or take envelope for last touched parameter
 About: Adds tracks or takes envelopes for the last touched FX parameter.
-Version: 1.0
+Version: 1.01
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
 Changelog:
-    + initial release
+  # check the pointer when parameter modulation is enabled
 --]]
 
 ---------- USER DEFINABLES ----------
@@ -63,7 +63,7 @@ function track_fx(track, paramnumber, fx_number)
     end
     local _, param_name = reaper.TrackFX_GetParamName(track, fx_number, paramnumber, "")
     local env = reaper.GetFXEnvelope(track, fx_number, paramnumber, false)
-    if env and toggle then
+    if reaper.ValidatePtr2(0, env, "TrackEnvelope*") and toggle then
       local _, env_chunk = reaper.GetEnvelopeStateChunk(env, "", false)
       local vis = env_chunk:match("VIS (%d)")
       if vis == "1" then -- if env is visible
