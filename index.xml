@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="d8cbac535257d8bc8343b1d75a4fcf361c503f1a">
+<index version="1" name="Neutronic Scripts" commit="59827435b6b0992f6c01a87580770efe84f3d33f">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -16,6 +16,10 @@
       <version name="1.0" author="Neutronic" time="2019-07-19T00:04:37Z">
         <changelog><![CDATA[+ initial release]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/55ea23d43b8f441a0a2b5e9bc2e1e85884513a6d/FX/neutronic_Show%20track%20or%20take%20envelope%20for%20last%20touched%20parameter.lua</source>
+      </version>
+      <version name="1.01" author="Neutronic" time="2020-05-04T06:38:06Z">
+        <changelog><![CDATA[# check the pointer when parameter modulation is enabled]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/59827435b6b0992f6c01a87580770efe84f3d33f/FX/neutronic_Show%20track%20or%20take%20envelope%20for%20last%20touched%20parameter.lua</source>
       </version>
     </reapack>
   </category>
