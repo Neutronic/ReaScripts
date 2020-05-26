@@ -442,7 +442,8 @@ if not pcall(doFile, scr.config) then
             os = cur_os,
             db_scan = 1,
             --wnd_w_prefs = 424,
-            search_delay = 0
+            search_delay = 0,
+            undock = true
            }
                   
   initGlobalTypesOrder()  
