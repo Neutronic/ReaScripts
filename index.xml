@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="95add64b4f0544a4bb90b4f430d2e5d68b0549a5">
+<index version="1" name="Neutronic Scripts" commit="cfc6c0c9ee43bf50987d3129c613e5b0bb5bff4c">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -233,7 +233,7 @@ Various:
   box after insertion" is on
 # don't reset QA2 result selection after insertion if search box is empty
 # bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/95add64b4f0544a4bb90b4f430d2e5d68b0549a5/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/cfc6c0c9ee43bf50987d3129c613e5b0bb5bff4c/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
