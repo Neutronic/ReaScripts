@@ -442,8 +442,7 @@ if not pcall(doFile, scr.config) then
             os = cur_os,
             db_scan = 1,
             --wnd_w_prefs = 424,
-            search_delay = 0,
-            undock = true
+            search_delay = 0
            }
                   
   initGlobalTypesOrder()  
@@ -476,6 +475,10 @@ if config.results_ph == nil then
   config.results_ph = true
 else
   config.results_ph = config.results_ph
+end
+
+if config.undock == nil then
+  config.undock = true
 end
 
 if config.act_search == nil then
@@ -3658,6 +3661,7 @@ scr.actions.resSet = function(name, kb)
     gui.w = gui.wnd_w - gui.border * (config.undock and 2 or 5)
     gui.wnd_h_save = gui.wnd_h
     gui.reinit = true
+    scr.refresh_ph = true
   end
   
   if type(kb) == "table" then
@@ -3955,7 +3959,8 @@ function mainView()
       config.results_max_saved = config.results_max
     end
     
-    if not scr.dock_h or scr.dock_h ~= gfx.h then
+    if not scr.dock_h or scr.dock_h ~= gfx.h or scr.refresh_ph then
+      scr.refresh_ph = nil
       scr.dock_h = gfx.h
       config.results_max = math.floor((gfx.h - gui.Row1.h - gui.border*6) / gui.row_h) - 1
       scr.re_search = true
