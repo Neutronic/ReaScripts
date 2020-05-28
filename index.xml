@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="654a925b5500fca033b69251c0ecb894b4090259">
+<index version="1" name="Neutronic Scripts" commit="11377c14bc88f0cd6a66f5e6ba533bff28fa5cfc">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -234,6 +234,43 @@ Various:
 # don't reset QA2 result selection after insertion if search box is empty
 # bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/654a925b5500fca033b69251c0ecb894b4090259/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.21" author="Neutronic" time="2020-05-28T03:47:46Z">
+        <changelog><![CDATA[# recall docked state on QA2 reopening
+
+New in v2.20
+Text selection for editing:
++ marquee select search box text
++ "Ctrl(Cmd) + A" or double-click a search query to select all text
++ "Ctrl(Cmd) + Left/Right" to move one word at a time
++ "Shift + Left/Right"  to select one letter at a time
++ "Ctrl(Cmd) + Shift + Left/Right" to select one word at a time
++ "Home" to go to start of the search query
++ "End" to go to the end of search query
+
+The docked mode:
++ right-click the hints bar to dock/undock the script's GUI
++ automatically set result rows number when docked
++ option to show result placeholders when docked
++ highlight the GUI when docked and the script is focused
++ temporarily undock the script when user opens QA2 Preferences
++ adjust results text size for the docked mode
++ open the filter tray vertically when docked and GUI width is
+  less than the tray width
+
+Various:
++ option to float FX at mouse cursor
++ maximum number of result rows increased to 99 for the undocked mode
++ unlock minimum horizontal GUI size
++ HiDPI/Retina displays support
+# make sure ALT + Key shortcuts do not collide with SHIFT + ALT + Key
+# fixed the "FX" filter sorting
+# fixed search box memory clearing when backspasing a whole query
+# insert correct result when no tracks selected and "Clear search
+  box after insertion" is on
+# don't reset QA2 result selection after insertion if search box is empty
+# bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/11377c14bc88f0cd6a66f5e6ba533bff28fa5cfc/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
