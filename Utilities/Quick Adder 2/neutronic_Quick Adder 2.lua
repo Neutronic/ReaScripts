@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.20
+Version: 2.21
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,6 +10,9 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
+  # recall docked state on QA2 reopening
+
+  New in v2.20
   Text selection for editing:
   + marquee select search box text
   + "Ctrl(Cmd) + A" or double-click a search query to select all text
@@ -633,7 +636,7 @@ function exit_states()
   config.wnd_y = not config.undock and config.wnd_y or wnd_y
   config.version = scr.version
   if config.default_mode then config.mode = config.default_mode end
-  if scr.temp_undock then config.undock = nil end
+  if scr.temp_undock then config.undock = false end
   writeFile(scr.config, tableToString("config", config))
   writeFile(scr.config, tableToString("global_types", global_types), "a")
   writeFile(scr.config, tableToString("global_types_order", global_types_order), "a")
@@ -3293,7 +3296,7 @@ scr.actions.view = function(o)
 
   if scr.temp_undock and o == "view_main" then
     scr.temp_undock = nil
-    config.undock = nil
+    config.undock = false
     gui.reopen = true
   elseif gfx.dock(-1)&1 == 1 and o == "view_prefs" then
     config.undock = true
@@ -4447,7 +4450,7 @@ function kbActions()
   elseif gui.m_cap == 0 and gui.ch == ignore_ch.f2 and gui.view == "prefs" then
     if scr.temp_undock then
       scr.temp_undock = nil
-      config.undock = nil
+      config.undock = false
       gui.reopen = true
     end
     gui.clicked = {id = "view_main", m_cap = 1, o = gui.Prefs.Nav.Back}
@@ -5171,7 +5174,7 @@ end
 function guiDock()
   if gfx.dock(-1)&1 == 0 then
     config.dock = config.dock and config.dock or 2<<8|1
-    config.undock = nil
+    config.undock = false
     config.wnd_y = select(3, gfx.dock(-1, 0, 0, 0, 0))
     config.wnd_h_save = gui.wnd_h
   else
@@ -5192,7 +5195,7 @@ function main()
   if gui.open and (not scr.dock or scr.dock ~= gfx.dock(-1)&1) then
     scr.dock = gfx.dock(-1)&1
     if scr.dock == 1 then
-      config.undock = nil
+      config.undock = false
       scr.main_w_rs = gfx.w
     else
       scr.main_w_rs = nil
@@ -5307,7 +5310,7 @@ function main()
   if gui.ch == -1 then
     if scr.temp_undock then
       scr.temp_undock = nil
-      config.undock = nil
+      config.undock = false
       gui.reopen = true
       gui.view = "main"
       gui:init()
