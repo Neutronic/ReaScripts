@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.21
+Version: 2.22
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # recall docked state on QA2 reopening
+  # fixed Default Filter setting
 
   New in v2.20
   Text selection for editing:
@@ -3189,7 +3189,7 @@ scr.actions.defMode = function(str)
   if str == "LAST USED" then
     config.default_mode = nil
   else
-    config.default_mode = strf
+    config.default_mode = str
   end
 end
 
