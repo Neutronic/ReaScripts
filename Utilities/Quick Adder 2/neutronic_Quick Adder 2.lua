@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.22
+Version: 2.23
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fixed Default Filter setting
+  # sanitize backslashes in JS descriptions
 
   New in v2.20
   Text selection for editing:
@@ -1270,7 +1270,7 @@ function getJs()
 
     if js_name then
       local path = file_list[i]:gsub(".+/Effects/", "")
-      js_name = js_name:gsub("\"", "\\%0")
+      js_name = js_name:gsub("\\", "\\\\"):gsub("\"", "\\%0")
       
       if rpr.def_fx_filt and fxExclCheck("js:" .. js_name:lower()) then goto SKIP end
       if rpr.def_fx_filt and not fxExclCheck("js:" .. js_name:lower(), true) then goto SKIP end
