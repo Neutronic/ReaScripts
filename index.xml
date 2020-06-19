@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="9cac68f6cd9114c6b6c60da5d389f4d8af543126">
+<index version="1" name="Neutronic Scripts" commit="7df725928de1f3d73cea8bcbbaf98abe7d095bfe">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -345,6 +345,19 @@ Various:
 # don't reset QA2 result selection after insertion if search box is empty
 # bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/9cac68f6cd9114c6b6c60da5d389f4d8af543126/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.25" author="Neutronic" time="2020-06-19T13:28:38Z">
+        <changelog><![CDATA[+ search FX browser folders
++ new FOL search filter for FX browser folders
++ option to disable FX folders searching (PREFS --> Search and ...)
++ new INS search filter for virtual instruments
++ FX search filter now gets effects only
++ configure Filter Tray items (right-click the tray button)
++ configure FX show options (right-click the Show FX button)
+# move "Show FX at mouse cursor" to FX show options
+# improve illegal characters sanitizing
+# internal optimizations]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/7df725928de1f3d73cea8bcbbaf98abe7d095bfe/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
