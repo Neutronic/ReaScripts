@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.23
+Version: 2.25
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,40 +10,16 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # escape backslashes in JS descriptions
-
-  New in v2.20
-  Text selection for editing:
-  + marquee select search box text
-  + "Ctrl(Cmd) + A" or double-click a search query to select all text
-  + "Ctrl(Cmd) + Left/Right" to move one word at a time
-  + "Shift + Left/Right"  to select one letter at a time
-  + "Ctrl(Cmd) + Shift + Left/Right" to select one word at a time
-  + "Home" to go to start of the search query
-  + "End" to go to the end of search query
-  
-  The docked mode:
-  + right-click the hints bar to dock/undock the script's GUI
-  + automatically set result rows number when docked
-  + option to show result placeholders when docked
-  + highlight the GUI when docked and the script is focused
-  + temporarily undock the script when user opens QA2 Preferences
-  + adjust results text size for the docked mode
-  + open the filter tray vertically when docked and GUI width is
-    less than the tray width
-  
-  Various:
-  + option to float FX at mouse cursor
-  + maximum number of result rows increased to 99 for the undocked mode
-  + unlock minimum horizontal GUI size
-  + HiDPI/Retina displays support
-  # make sure ALT + Key shortcuts do not collide with SHIFT + ALT + Key
-  # fixed the "FX" filter sorting
-  # fixed search box memory clearing when backspasing a whole query
-  # insert correct result when no tracks selected and "Clear search
-    box after insertion" is on
-  # don't reset QA2 result selection after insertion if search box is empty
-  # bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking
+  + search FX browser folders
+  + new FOL search filter for FX browser folders
+  + option to disable FX folders searching (PREFS --> Search and ...)
+  + new INS search filter for virtual instruments
+  + FX search filter now gets effects only
+  + configure Filter Tray items (right-click the tray button)
+  + configure FX show options (right-click the Show FX button)
+  # move "Show FX at mouse cursor" to FX show options
+  # improve illegal characters sanitizing
+  # internal optimizations
 --]]
 
 local rpr = {}
@@ -167,7 +143,9 @@ else
   if os_is.mac then
     rpr.au = rpr.path .. "/reaper-auplugins.ini"
   end
-end         
+end
+
+rpr.fx_folders = rpr.path .. "/reaper-fxfolders.ini"
          
 local white_ch = {del = 6579564,
                   bs = 8}
@@ -234,17 +212,16 @@ local keep_state_names = {
                     {"REC", "Record arm"},
                     {"VOLPAN", "Volume and pan"}}
 
-local sh_list = {["2"] = "VST2", ["3"] = "VST3", c = "CHAIN",
-                  u = os_is.mac and "AU" or nil, a = "ALL",
-                  x = "FX", j = "JS", f = "FAV", t = "TEMPLATE",
-                  n = "ACTION"}
-
 function doFile(str)
   dofile(str)
 end
 
 function magicFix(str)
   return str:gsub("[%(%)%.%+%-%*%?%[%]%^%$%%]", "%%%1")
+end
+
+function escSeqFix(str)
+  return str:gsub("[\a\b\f\n\r\t\v\0]", ""):gsub("[\'\"\\]", "\\%0")
 end
 
 function a_macYoffset()end
@@ -258,7 +235,7 @@ function macYoffset(cur_h, new_h, y)
   return y
 end
 
-function tableToString(name, tbl)
+function tableToString(name, tbl, escape)
   local str = name .. " = {\n"
   
   local tbl_sorted = {}
@@ -280,7 +257,7 @@ function tableToString(name, tbl)
   
   function valueParse(v)
     if type(v) == "string" then
-      return '"' .. v ..  '"'
+      return '"' .. (escape and escSeqFix(v) or v) ..  '"'
     elseif type(v) == "boolean" then
       return tostring(v)
     else
@@ -300,6 +277,32 @@ function writeFile(path, str, manual)
   local f = assert(io.open(path, manual or "w"))
   f:write(str)
   f:close()
+end
+
+function getFXfolder(str, type_n)
+  local fx_folder = ""
+  if config and not config.fol_search then return fx_folder end
+  
+  if type_n == 3 then -- if VST
+    local vst_id, vst_file = str:match("(.-)//(.+)")
+    for i = 1, fx_folders and #fx_folders or 0 do
+      if fx_folders[i].content:match(vst_id) or
+         fx_folders[i].content:gsub("[^%w%.]", "_"):match(vst_file) then
+        fx_folder = fx_folder .. "\t" .. fx_folders[i].name
+      end
+    end
+  else
+    for i = 1, fx_folders and #fx_folders or 0 do
+      if fx_folders[i].content:match("Item%d+=" .. magicFix(str)) then
+        local fx_n = fx_folders[i].content:match("Item(%d+)=" .. magicFix(str))
+        if fx_folders[i].content:match("Type" .. fx_n .. "=" .. type_n) then
+          fx_folder = fx_folder .. "\t" .. fx_folders[i].name
+        end
+      end
+    end
+  end
+  
+  return fx_folder
 end
 
 function listDir(path)
@@ -327,13 +330,19 @@ function listFiles(path, ext)
     local path = not path:match("/$") and path .. "/" or path:match("/$") and path
     local file = reaper.EnumerateFiles(path, i)
     if not file then break end
+    
+    file = escSeqFix(file)
+    
     if file:match("[^%.]-$") == ext then
       if ext == "RfxChain" and not path:match("/FXChains/") then goto SKIP end
       file = file:gsub("%." .. ext, "")
       local fx_type = ext == "RfxChain" and "CHAIN" or ext == "RTrackTemplate" and "TEMPLATE"
       if rpr.def_fx_filt and ext == "RfxChain" and fxExclCheck(fx_type .. ":" .. file:lower()) then goto SKIP end
       if rpr.def_fx_filt and ext == "RfxChain" and not fxExclCheck(fx_type .. ":" .. file:lower(), true) then goto SKIP end
-      table.insert(file_list, fx_type .. ":" .. file .. "|,|" .. [[]] .. path .. [[]] .. "|,||,||,|")
+      
+      local fx_folder = getFXfolder(file, 1000)
+      
+      table.insert(file_list, fx_type .. ":" .. file .. fx_folder .. "|,|" .. [[]] .. path .. [[]] .. "|,||,||,|")
       ::SKIP::
     elseif file:match("^.+jsfx$") or not ext and
            (not file:match("%.") or file:match("%d%.%d")) then -- if JS
@@ -445,7 +454,8 @@ if not pcall(doFile, scr.config) then
             os = cur_os,
             db_scan = 1,
             --wnd_w_prefs = 424,
-            search_delay = 0
+            search_delay = 0,
+            float_mode = 4,
            }
                   
   initGlobalTypesOrder()  
@@ -466,6 +476,15 @@ if not pcall(doFile, scr.config) then
   keep_states.GROUP_FLAGS_HIGH = keep_states.GROUP_FLAGS
 end
 
+if config.db_scan == 2 then
+  db.saved = false
+elseif config.db_scan == 1 and reaper.GetExtState("Quick Adder", "SCAN") ~= "1" then
+  db.saved = false
+  reaper.SetExtState("Quick Adder", "SCAN", "1", false)
+elseif config.db_scan == 3 or reaper.GetExtState("Quick Adder", "SCAN") == "1" then
+  db.saved = pcall(doFile, scr.plugs)
+end
+
 config.dbl_click_speed = config.dbl_click_speed and config.dbl_click_speed or 0.25
 
 if config.fav_persist == nil then
@@ -484,13 +503,59 @@ if config.undock == nil then
   config.undock = true
 end
 
-if config.act_search == nil then
+if config.act_search == nil and reaper.CF_EnumerateActions then
+  db.saved = false
   config.act_search = true
   global_types.ACTION = true
   config.global_types_n = config.global_types_n + 1
   table.insert(global_types_order, "ACTION")
-else
+end
+
+if not filter_modes then
+  filter_modes = {ALL = true,
+                  CHAIN = true,
+                  FAV = true,
+                  FOLDER = config.fol_search and true or nil,
+                  FX = false,
+                  INSTRUMENT = false,
+                  JS = true,
+                  TEMPLATE = true,
+                  VST2 = true,
+                  VST3 = true,
+                  AU = os_is.mac and true or nil,
+                  ACTION = config.act_search and true or nil
+                  }
+end
+
+if reaper.CF_EnumerateActions then
   config.act_search = config.act_search
+  filter_modes.ACTION = config.act_search or nil
+else
+  config.act_search = nil
+  filter_modes.ACTION = nil
+  global_types.ACTION = nil
+  config.global_types_n = config.global_types_n - 1
+  for i, v in ipairs(global_types_order) do
+    if v == "ACTION" then
+      table.remove(global_types_order, i)
+      break
+    end
+  end
+end
+
+if config.fol_search == nil then
+  config.fol_search = true
+  filter_modes.FOLDER = true
+  db.saved = false
+  VST2 = nil
+  VST3 = nil
+  JS = nil
+  CHAIN = nil
+  TEMPLATE = nil
+  AU = nil
+  ACTION = nil
+else
+  config.fol_search = config.fol_search
 end
 
 config2 = config
@@ -505,18 +570,12 @@ local global_types = config2
 config2 = global_types_order
 global_types_order = nil
 local global_types_order = config2
+config2 = filter_modes
+filter_modes = nil
+local filter_modes = config2
 config2 = nil
 
 if not config.no_sel_tracks then config.no_sel_tracks = 1 end
-
-if config.db_scan == 2 then
-  db.saved = false
-elseif config.db_scan == 1 and reaper.GetExtState("Quick Adder", "SCAN") ~= "1" then
-  db.saved = false
-  reaper.SetExtState("Quick Adder", "SCAN", "1", false)
-elseif config.db_scan == 3 or reaper.GetExtState("Quick Adder", "SCAN") == "1" then
-  db.saved = pcall(doFile, scr.plugs)
-end
 
 if os_is.win and config.mode == "AU" then config.mode = "ALL" end
 
@@ -526,9 +585,11 @@ if config.os ~= cur_os then
   if os_is.mac then
     config.global_types_n = not global_types.AU and config.global_types_n + 1 or config.global_types_n
     global_types.AU = true
+    filter_modes.AU = true
   else
     config.global_types_n = global_types.AU and config.global_types_n - 1 or config.global_types_n
     global_types.AU = nil
+    filter_modes.AU = nil
     for i = 1, #global_types_order do
       if global_types_order[i] == "AU" then
         table.remove(global_types_order, i)
@@ -548,6 +609,12 @@ end
 if not config.version then config.version = scr.version end
 
 if config.version ~= scr.version then config.reminder = true end
+
+local sh_list = {["2"] = "VST2", ["3"] = "VST3", c = "CHAIN",
+                  u = os_is.mac and "AU" or nil, a = "ALL",
+                  x = "FX", j = "JS", f = "FAV", t = "TEMPLATE",
+                  i = "INSTRUMENT", o = config.fol_search and "FOLDER" or nil,
+                  n = config.act_search and "ACTION" or nil}
 
 if not pcall(doFile, scr.fav) then
   FAV = {}
@@ -640,8 +707,9 @@ function exit_states()
   writeFile(scr.config, tableToString("config", config))
   writeFile(scr.config, tableToString("global_types", global_types), "a")
   writeFile(scr.config, tableToString("global_types_order", global_types_order), "a")
+  writeFile(scr.config, tableToString("filter_modes", filter_modes), "a")
   writeFile(scr.config, tableToString("keep_states", keep_states), "a")
-  writeFile(scr.fav, tableToString("FAV", db.FAV))
+  writeFile(scr.fav, tableToString("FAV", db.FAV, true))
   reaper.DeleteExtState("Quick Adder", "MSG", false)
 end
 
@@ -768,10 +836,28 @@ function getDb(refresh)
     
       if _timers.db_defer.up then
         _timers.db_defer = nil
+        
+        if config.fol_search then
+          local fx_folders_ini = getContent(rpr.fx_folders)
+          
+          if fx_folders_ini then
+            fx_folders = {}
+            for match in fx_folders_ini:gmatch("Name.-\n") do
+              local n, name = match:match("Name(%d+)=(.+)\n")
+              fx_folders[n+1] = {name = name}
+            end
+          
+            for match in fx_folders_ini:gmatch("%[.-%d+%].-\n\n") do
+              local n, content = match:match("%[.-(%d+)%](.+)\n")
+              fx_folders[n+1].content = content
+            end
+            
+            fx_folders_ini = nil
+          end
+        end
 
         local r_ini = getContent(reaper.get_ini_file())
         --[[rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
-        r_ini = nil
         fx_dir_list = getFxDir(rpr.vstpath)
         fx_file_list = listArrayDirFiles(fx_dir_list)]]
         --rpr.aupath = os_is.mac and {"Library/Audio/Plug-Ins/Components",
@@ -782,6 +868,7 @@ function getDb(refresh)
         rpr.def_fx_filt = parseIniFxFilt(findContentKey(r_ini,
                           rpr.x64 and (os_is.win and "def_fx_filt64" or "def_fx_filtx64") or
                           os_is.win and "def_fx_filt32" or "def_fx_filtx32"))
+        r_ini = nil
         db.VST2 = {}
         db.VST3 = {}
         getVst()
@@ -816,6 +903,7 @@ function getDb(refresh)
         end
 
         get_db = nil
+        fx_folders = nil
         if refresh then
           gui.wnd_h_save = gui.wnd_h
           gui.reinit = true
@@ -952,7 +1040,7 @@ function fxTrack(sel_tr_count, is_m_sel)
         if name == "No FX" then return name end
          
         if i == 0 then
-          fxTrack_Float(track, name)
+          fxFloat(track, name)
         end
       end
        
@@ -962,7 +1050,7 @@ function fxTrack(sel_tr_count, is_m_sel)
         if name == "No FX" then return end
         
         if sel_tr_count == 0 then
-          fxTrack_Float(m_track, name)
+          fxFloat(m_track, name)
         end
       end
       
@@ -1052,12 +1140,13 @@ end
 
 function parseResultsList(v)
   local fx_type, name, path, undo_name = v:match("(%w-:)(.-)|,|(.-)|,|.+")
+  name = name:gsub("\t.+", "") -- remove folders
   if fx_type == "JS:" then -- if JS
-    if name ~= "Video processor" then
+    if not name:match("Video processor") then
       undo_name = name
       name = fx_type .. path -- fx_type + path
     else
-      undo_name = name:gsub(" %(.+%)", "")
+      undo_name = path
     end
   elseif fx_type == "CHAIN:" then
     local path = path:gsub(rpr.path .. "/FXChains/", "")
@@ -1068,6 +1157,7 @@ function parseResultsList(v)
     undo_name = name:gsub(" %(.+%)", "")
     name = fx_type .. name -- fx_type + name - VSTi
   end
+  
   return name, undo_name
 end
 
@@ -1092,31 +1182,41 @@ function fxTrack_Add(track)
   end
 end
 
-function fxTrack_Float(track, name)
-  if isInput() then -- if input FX
-    if not name:match("%.RfxChain") then -- if not chain
-      local chunk = select(2, reaper.GetTrackStateChunk(track, "", false))
-      local is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.-SHOW (%d+)"))
-      if not is_fxc_vis or is_fxc_vis == 0 then -- if FX chain is hidden
-        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, config.fx_hide and 2 or 3)
-      else
-        reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, 2)
-      end
+function fxFloat(obj, name)
+  local obj_type
+  if reaper.ValidatePtr2(0, obj, "MediaTrack*") then
+    obj_type = "Track"
+  else reaper.ValidatePtr2(0, obj, "MediaItem_Take*")
+    obj_type = "Take"
+  end
+   
+  local is_fxc_vis
+  if not name:match("%.RfxChain$") then -- if not chain
+    if isInput() then
+      local chunk = select(2, reaper.GetTrackStateChunk(obj, "", false))
+      is_fxc_vis = tonumber(chunk:match("<FXCHAIN_REC.-SHOW (%d+)"))
     else
-      reaper.TrackFX_Show(track, 0x1000000+reaper.TrackFX_GetRecCount(track)-1, config.fx_hide and 2 or 1)
-    end
-  else
-    if not name:match("%.RfxChain") then -- if not chain
-      local is_fxc_vis = reaper.TrackFX_GetChainVisible(track)
-      if is_fxc_vis == -1 then -- if FX chain is hidden
-        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, config.fx_hide and 2 or 3)
-      else
-        reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, 2)
-      end
-    else
-      reaper.TrackFX_Show(track, reaper.TrackFX_GetCount(track)-1, config.fx_hide and 2 or 1)
+      is_fxc_vis = reaper[obj_type .. "FX_GetChainVisible"](obj)
     end
   end
+  
+  local fx_idx = (isInput() and 0x1000000 + reaper.TrackFX_GetRecCount(obj) or
+            reaper[obj_type .. "FX_GetCount"](obj)) - 1
+      
+  if config.float_mode == 2 then -- if always show in FX chain
+    reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 1)
+  elseif config.float_mode == 3 then -- if always float
+    reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 3)  
+  elseif name:match("%.RfxChain$") then -- if chain
+    reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 1)
+  else
+    if isInput() and (not is_fxc_vis or is_fxc_vis == 0) or is_fxc_vis == -1 then -- if FX chain is hidden
+      reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 3)
+    else
+      reaper[obj_type .. "FX_Show"](obj, fx_idx, 2)
+    end                            
+  end
+  
   if not config.fx_hide and config.float_at_mouse and 
      reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M") > 0 then
     reaper.Main_OnCommand(reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M"), 0)
@@ -1148,21 +1248,9 @@ function fxItem(sel_it_count)
         end
 
         if i == 0 then
-          if not name:match("%.RfxChain") then -- if not chain
-            local is_fxc_vis = reaper.TakeFX_GetChainVisible(take)
-            if is_fxc_vis == -1 then -- if FX chain is hidden
-              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, config.fx_hide and 2 or 3)
-            else
-              reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, 2)
-            end
-          else
-            reaper.TakeFX_Show(take, reaper.TakeFX_GetCount(take)-1, config.fx_hide and 2 or 1)
-          end
+          fxFloat(take, name)
         end
-        if not config.fx_hide and config.float_at_mouse and 
-           reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M") > 0 then
-          reaper.Main_OnCommand(reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M"), 0)
-        end
+        
       end
       ::SKIP::
       
@@ -1252,7 +1340,11 @@ function getVst()
     if rpr.def_fx_filt and fxExclCheck(fx_type:lower():gsub("vst2", "vst") .. vst_name:lower()) then goto SKIP end
     if rpr.def_fx_filt and not fxExclCheck(fx_type:lower():gsub("vst2", "vst") .. vst_name:lower(), true) then goto SKIP end
     
-    local val = fx_type .. vst_name .. "|,|" .. vst_file .. "|,|" .. vst_i .. "|,|" .. vst_id .. "|,|"
+    local fx_folder = getFXfolder(vst_id .. "//" .. vst_file, 3)
+    
+    local val = fx_type .. vst_name .. fx_folder .. "|,|" .. vst_file .. "|,|" .. vst_i .. "|,|" .. vst_id .. "|,|"
+    vst_name = escSeqFix(vst_name)
+    
     table.insert(sub_tbl, val)
     ::SKIP::
   end
@@ -1270,18 +1362,23 @@ function getJs()
 
     if js_name then
       local path = file_list[i]:gsub(".+/Effects/", "")
-      js_name = js_name:gsub("\\", "\\\\"):gsub("\"", "\\%0")
+      --js_name = js_name:gsub("\\", "\\\\"):gsub("\"", "\\%0")
       
       if rpr.def_fx_filt and fxExclCheck("js:" .. js_name:lower()) then goto SKIP end
       if rpr.def_fx_filt and not fxExclCheck("js:" .. js_name:lower(), true) then goto SKIP end
- 
-      table.insert(db.JS, "JS:" .. js_name .. "|,|" .. path .. "|,||,||,|")
+      local fx_folder = getFXfolder(path, 2)
+      
+      js_name = escSeqFix(js_name)
+      table.insert(db.JS, "JS:" .. js_name .. fx_folder .. "|,|" .. path .. "|,||,||,|")
     end
     ::SKIP::
   end
   
   if rpr.def_fx_filt and fxExclCheck("js:video processor") then goto SKIP end
-  table.insert(db.JS, "JS:Video processor" .. "|,|" .. "Video processor" .. "|,||,||,|")
+  
+  local fx_folder = getFXfolder("Video processor", 6)
+ 
+  table.insert(db.JS, "JS:Video processor" .. fx_folder .. "|,|" .. "Video processor" .. "|,||,||,|")
   ::SKIP::
 end
 
@@ -1295,7 +1392,11 @@ function getAu()
       if not au_name:match("^#") then
         if rpr.def_fx_filt and fxExclCheck("au" .. au_i .. ":" .. au_name:lower()) then goto SKIP end
         if rpr.def_fx_filt and not fxExclCheck("au" .. au_i .. ":" .. au_name:lower(), true) then goto SKIP end
-        table.insert(db.AU, "AU" .. au_i .. ":" .. au_name .. "|,||,|" .. au_i .. "|,||,|")
+        
+        local fx_folder = getFXfolder(au_name, 5)
+        
+        au_name = escSeqFix(au_name)
+        table.insert(db.AU, "AU" .. au_i .. ":" .. au_name .. fx_folder .. "|,||,|" .. au_i .. "|,||,|")
       end
     end
     ::SKIP::
@@ -1317,7 +1418,8 @@ function getAction()
     i = i + 1
     if name ~= "" then
       local id_named = reaper.ReverseNamedCommandLookup(id) or ""
-      name = name:gsub("\"", "\\\"")
+      name = escSeqFix(name)
+      
       local act = "ACTION:" .. name .. "|,|" .. id_named .. "|,|" ..
             section[n].name .. "/" .. section[n].id .. "|,|" .. id .. "|,|"
       table.insert(db.ACTION, act)
@@ -1338,9 +1440,14 @@ function doMatch()
   if config.mode == "ALL" then
     getResultsListFav()
     matchType()
-  elseif config.mode == "FX" then
-    getResultsListFav(_, true)
+  elseif config.mode == "FX" or config.mode == "FOLDER" then
+    getResultsListFav(nil, true)
     matchType(true)
+  elseif config.mode == "INSTRUMENT" then
+    getResultsListFav(nil, nil, true)
+    getResultsList("VST2", nil, true)
+    getResultsList("VST3", nil, true)
+    if os_is.mac then getResultsList("AU", nil, true) end
   elseif config.mode == "FAV" then
     getResultsListFav()
     getResultsList("FAV")
@@ -1358,17 +1465,23 @@ function doMatch()
   end 
 end
 
-function getResultsListFav(fx_type, fx_only)
+function getResultsListFav(fx_type, fx_only, ins_only)
   if gui.str ~= "" then return end
   for i, v in ipairs(db.FAV) do
     local l = v:match("(.-)|,|.+"):lower()
     if fx_type then
       fx_type_match = l:match("^" .. fx_type:lower())
+      if not fx_type_match then goto SKIP end
+   elseif fx_only then
+      if l:match("^chain") or l:match("^template") or l:match("^action") or
+         config.mode == "FOLDER" and not l:match("\t.+") or
+         config.mode == "FX" and l:match("^%w-i:") then
+        goto SKIP
+      end
+    elseif ins_only and not l:match("^%w+i:") then
+      goto SKIP
     end
-    if fx_only then
-      fx_type_match = l:match("^chain") or l:match("^template") or l:match("^action")
-    end
-    if fx_type and not fx_type_match or not fx_type and fx_type_match then goto SKIP end
+    
     if #scr.results_list == config.results_max and config.results_max > 0 then
       fx_type_match = nil
       break
@@ -1380,9 +1493,9 @@ function getResultsListFav(fx_type, fx_only)
   end
 end
 
-function getResultsList(fx_type, fx_only)
+function getResultsList(fx_type, fx_only, ins_only)
   if gui.str == "" then return end
-  if fx_type == "FAV" and config.mode ~= "ALL" and
+  if fx_type == "FAV" and config.mode ~= "ALL" and config.mode ~= "FOLDER" and
      config.mode ~= "FX" and config.mode ~= "FAV" and
      #scr.query_parts > 0 and
      not (#scr.query_parts == 1 and scr.query_parts[1]:match("^/")) then
@@ -1390,11 +1503,17 @@ function getResultsList(fx_type, fx_only)
     scr.fav_type = true
   end
   for i, v in ipairs(db[fx_type]) do
-    local l, part_match = v:match("(.-)|,|.+"):lower()
+    local l, part_match = v:match("(.-)|,|.+")
+    if not l then goto LOOP_END end
+    l = l:lower()
     if fx_only then
-      if l:match("^chain") or l:match("^template") or l:match("^action") then
+      if l:match("^chain") or l:match("^template") or l:match("^action") or
+         config.mode == "FOLDER" and not l:match("\t.+") or
+         config.mode == "FX" and l:match("^%w-i:") then
         goto LOOP_END
       end
+    elseif ins_only and not l:match("^%w+i:") then
+      goto LOOP_END
     end
     for m = 1, #scr.query_parts do
       --
@@ -1772,7 +1891,9 @@ Additional keyboard shortcuts:
 ]]..(os_is.win and "    U: set the search filter to AU;\n" or "")..[[
     C: set the search filter to CH (FX chains);
     F: set the search filter to FAV (favorites);
-    X: set the search filter to FX (all FX types combined);
+    O: set the search filter to FOL (FX browser folders);
+    X: set the search filter to FX (effects only);
+    I: set the search filter to INS (virtual instruments);
     J: set the search filter to JS;
     T: set the search filter to TT (track templates);
     2: set the search filter to VST2;
@@ -1812,7 +1933,7 @@ function parseQuery()
    for word in data:gmatch("[^%s]+") do --"[%w%p]+"
      i = i + 1
   
-     word = word:gsub("[\\\"\']", "\\%1")
+     word = word:gsub("[\\\"]", "\\%1")
      word = magicFix(word)
      --[[if word == "/t" or word == "/i" then
        dest = word
@@ -1826,10 +1947,19 @@ end
 ---------------------- GUI -----------------------------
 function a_gui()end
 
+local countFilterModes = function()
+  local n = 0
+  for k, v in pairs(filter_modes) do
+    if v then n = n + 1 end
+  end
+  return n + 1
+end
+
+scr.filter_n = countFilterModes()
+
 function getMainW(get_w, relevant_filters)
   local w = (gui.row_h - 4 * math.floor(config.multi)) * 
-            ((relevant_filters and os_is.win and 9 or 10) + (config.act_search and 1 or 0)) +
-             5 * math.floor(config.multi) + gui.border * 2
+             scr.filter_n + 5 * math.floor(config.multi) + gui.border * 2
   if get_w then return w end
   return scr.main_w_rs or config.main_w_rs or w 
 end
@@ -1854,10 +1984,21 @@ gui.Results.sel = 1
 gui.lists = {}
 gui.lists.theme = {"dark", "light"}
 gui.lists.res_name = {"|720p", "|1080p", "|4k", "|5k", "|8k"}
-gui.lists.mode = {"ALL", "CHAIN", "FAV", "FX", "JS",
-                  "TEMPLATE", "VST2", "VST3", os_is.mac and "AU" or nil}
+                
+local defineFilterModes = function()
+  gui.lists.mode = {}
+  for k, v in pairs(filter_modes) do
+    if v then
+      table.insert(gui.lists.mode, k)
+    end
+  end
 
-if config.act_search then table.insert(gui.lists.mode, "ACTION") end
+  gui.lists.mode = sortAbc(gui.lists.mode)
+end
+
+defineFilterModes()
+
+--if config.act_search then table.insert(gui.lists.mode, "ACTION") end
 
 gui.lists.db_scan = {"once per REAPER startup",
                      "on every Quick Adder launch",
@@ -1865,12 +2006,12 @@ gui.lists.db_scan = {"once per REAPER startup",
 gui.lists.no_sel_tracks = {"prompts to select tracks to put FX on",
                            "adds FX to a new track",
                            "does nothing"}
-
-gui.lists.mode = sortAbc(gui.lists.mode)
 for i, v in ipairs(gui.lists.mode) do
   if v == config.mode then
     gui.mode_sel = {i}
     break
+  elseif i == #gui.lists.mode then
+    gui.mode_sel = {1}
   end
 end
 gui.mode_sel[2] = config.mode
@@ -2304,6 +2445,7 @@ function gui:setCursor()
 end
 
 function gui:hover(special)
+  if pu_wnd then return self end
   if self.hover_special and not special then return end
   if self:isOver() then
     gui.over = self.id
@@ -2407,6 +2549,7 @@ function gui:onClick()
 end
 
 function gui:onSelect()
+  if gui.m_cap == 25 or gui.m_cap == 29 then return end
   if (gui.m_cap&1 == 1) and not gui.active and not gui.click_ignore and
       self.on_select and not gui.selected and self.id then
     if gui.important and (gui.important:isOver() and gui.important.id ~= self.id or
@@ -2511,10 +2654,12 @@ function gui:drawDdMenu(fill, label, parent)
   
 
   self:drawTxt(tbl[label] == "CHAIN" and "CH" or tbl[label] == "TEMPLATE" and "TT" or
-               tbl[label] == "ACTION" and "ACT" or tbl[label] or
+               tbl[label] == "ACTION" and "ACT" or tbl[label] == "FOLDER" and "FOL" or
+               tbl[label] == "INSTRUMENT" and "INS" or tbl[label] or
                (self.table_name == "mode" and
                (label == "CHAIN" and "CH" or label == "TEMPLATE" and "TT" or
-                label == "ACTION" and "ACT") or label))
+                label == "ACTION" and "ACT" or label == "FOLDER" and "FOL" or
+                label == "INSTRUMENT" and "INS") or label))
 
   self.pad_x = pad_x_mem
   self:hover()
@@ -2768,7 +2913,11 @@ function gui:getMode()
   elseif config.mode == "TEMPLATE" then
     self:drawTxt("TT")
   elseif config.mode == "ACTION" then
-    self:drawTxt("ACT")  
+    self:drawTxt("ACT")
+  elseif config.mode == "FOLDER" then
+    self:drawTxt("FOL")
+  elseif config.mode == "INSTRUMENT" then
+    self:drawTxt("INS")  
   elseif config.mode == "FAV" then
     self.font = 8
     self.pad_y = fontSzAdjust(-4, -4)
@@ -2903,7 +3052,7 @@ function gui:textBox(ch, shrink)
     goto SKIP
   end
 
-  if not ignoreCh(ch) and not gui.focused then
+  if not ignoreCh(ch) and not gui.focused and gui.m_cap&mouse_mod.lmb == 0 then
     local valid_ch, str_w, ch_w = pcall(function()string.char(ch)end)
     if valid_ch then
       str_w = gfx.measurestr(gui.str)
@@ -3016,7 +3165,7 @@ function gui:textBox(ch, shrink)
              gfx.measurestr(gui.str_hl .. " ") - space_w,
              self.h - self.pad_x * config.multi * 2, 1)
   end
- 
+  
   self:drawTxt(gui.str, _, _, _, _, _, _, str_start_px)
   
   if gui.dd_items then return end 
@@ -3174,7 +3323,8 @@ function gui:textBox(ch, shrink)
     gui.str_b_temp = nil
   end
 
-  if gui.focus == 2 then
+  if gui.focus == 2 and (gui.m_cap&mouse_mod.lmb == 0 or
+     gui.m_cap&mouse_mod.lmb > 0 and carriage_suspend) then
     self:carriage(ch)
   else
     gui.blink = 0
@@ -3325,12 +3475,31 @@ scr.actions.cb = function(o)
   end
   if o.id == "cb_fav_persist" and not config.fav_persist then scr.actions.clear(_, true) end
   
-  if config.act_search and o.id == "cb_act_search" then
+  if o.id == "cb_fol_search" and config.fol_search then
+    filter_modes.FOLDER = true
+    defineFilterModes()
+    scr.filter_n = countFilterModes()
+    sh_list.o = "FOLDER"
+  elseif o.id == "cb_fol_search" then
+    filter_modes.FOLDER = nil
+    sh_list.o = nil
+    if config.mode == "FOLDER" then
+      config.mode = "ALL"
+      gui.mode_sel[2] = "ALL"
+      gui.dd_active_slot = nil
+    end
+    defineFilterModes()
+    scr.filter_n = countFilterModes()
+  end
+  
+  if o.id == "cb_act_search" and config.act_search then
     gui.wnd_w = getPrefsW()
     gui.w = gui.wnd_w - gui.border * 2
     gui.reinit = true
     gui.hints.ALL = "FX, track templates and actions"
+    sh_list.n = "ACTION"
     table.insert(gui.lists.mode, 1, "ACTION")
+    filter_modes["ACTION"] = true
     
     if not global_types.ACTION then
       for i, v in ipairs(global_types_order) do
@@ -3344,12 +3513,21 @@ scr.actions.cb = function(o)
       config.global_types_n = config.global_types_n + 1
     end
     if not db.ACTION then scr.actions.refreshDb() end
+    defineFilterModes()
+    scr.filter_n = countFilterModes()
   elseif o.id == "cb_act_search" then
     gui.wnd_w = getPrefsW()
     gui.w = gui.wnd_w - gui.border * 2
     gui.reinit = true
     gui.hints.ALL = "FX and track templates"
+    sh_list.n = nil
+    if config.mode == "ACTION" then
+      config.mode = "ALL"
+      gui.mode_sel[2] = "ALL"
+      gui.dd_active_slot = nil
+    end
     table.remove(gui.lists.mode, 1)
+    filter_modes["ACTION"] = nil
     if global_types.ACTION then
       for i, v in ipairs(global_types_order) do
         if v == "ACTION" then
@@ -3359,6 +3537,8 @@ scr.actions.cb = function(o)
       end
       global_types.ACTION = nil
       config.global_types_n = config.global_types_n - 1
+      defineFilterModes()
+      scr.filter_n = countFilterModes()
     end
   end
 end
@@ -3746,6 +3926,9 @@ scr.actions.link = function(o)
       config.db_scan_wait = nil
       db.saved = false
       getDb(true)
+      gui.wnd_w = getMainW()
+      gui.w = gui.wnd_w - gui.border * (config.undock and 2 or 5)
+      gui.reinit = true
     end
   elseif o.id:match(".-_(js)") then
     if reaper.ReaPack_GetRepositoryInfo and 
@@ -3759,7 +3942,9 @@ scr.actions.link = function(o)
   end
 end
 
-gui.hints = {FX = "FX",
+gui.hints = {FOLDER = "FX folders",
+             FX = "effects",
+             INSTRUMENT = os_is.mac and "VSTi, VST3i and AUi" or "VSTi and VST3i",
              TEMPLATE = "track templates",
              ALL = config.act_search and "FX, track templates and actions" or
                    "FX and track templates",
@@ -3903,13 +4088,14 @@ gui.hints.generate = function(id)
       gui.hints_txt = ""
     end
   end
-end 
- 
+end
+
+function a_guiParseResult()end
 function gui.parseResult(str)
   local fx_type, name, path, i, id, fav = str:match("(.-):(.-)|,|(.-)|,|(.-)|,|(.-)|,|(.*)")
   
   if fx_type == "JS" then
-    path = name == "Video processor" and "Built-in effect" or "/Effects/" .. path
+    path = name:match("Video processor") and "Built-in effect" or "/Effects/" .. path
   elseif name:match("SWS.-:") or name:match("^Custom.-:") then
     local ext = name:match("SWS.-:") and "SWS" or name:match("^Custom.-:") and "Custom"
           or "Ext"
@@ -3937,8 +4123,11 @@ function gui.parseResult(str)
     local section = i:match(".+/(.+)")
     local state = reaper.GetToggleCommandStateEx(section, id)
     name = name .. (state == 1 and " (on)" or state == 0 and " (off)" or "")
+  elseif fx_type ~= "TEMPLATE" then
+    local folder_name = name:match("\t.+") or ""
+    folder_name = folder_name:gsub("^\t", " (\\t"):gsub("\t", ", ")
+    name = name:gsub("\t.+", "") .. (folder_name ~= "" and folder_name or "")
   end
-  
 
   return name, fx_type, i, fav, path, id
 end
@@ -4027,7 +4216,8 @@ function mainView()
                                                      config.multi == res_multi["|1080p"] and 0.72 or
                                                      config.multi == res_multi["|8k"] and 0.82 or
                                                      0.8),
-                                     float_l = gui.Row1.Pin}                 
+                                     float_l = gui.Row1.Pin}    
+  gui.Row1.Float:onClickSpecial()                                   
   gui.Row1.Hints = gui.Row1:setChild{id = "hints", float_l_auto_w = gui.Row1.Float}
   gui.Row1.Hints:onClickSpecial()
   gui.Row2 = gui:setChild({id = "row2", h = gui.row_h, float_b = gui.Row1}, true)
@@ -4083,6 +4273,7 @@ function mainView()
                  10))
  
   gui.Row2.dd_Mode:setStyle("mode"):setStyle("mode_txt"):drawRect():getMode()--:color(5):drawBorder()
+  gui.Row2.dd_Mode:onClickSpecial()
 
   gui.Row2.Search:setStyle("search"):setStyle("search_txt"):drawRect()
   gfx.rect(gui.Row2.x1, gui.Row2.y1,
@@ -4145,7 +4336,8 @@ function mainView()
     gui.Results[i]:setStyle("search")
     if gui.Results.sel == i then
       gui.Results[i].font_c = config.theme == "light" and gui.Results[i].c or gui.Results[i].font_c
-      if not config.ext_check and gui.m_cap == mouse_mod.alt + mouse_mod.shift and
+      if not config.ext_check and gui.m_cap == mouse_mod.alt + mouse_mod.shift +
+         (gui.m_cap&mouse_mod.lmb) + (gui.m_cap&mouse_mod.rmb) + (gui.m_cap&mouse_mod.mmb) and
          select(4, gui.parseResult(scr.results_list[gui.Results.sel])) ~= "" then
         gui.Results[i].font_c = gui.bg_hue
         gui.Results[i].r = 253--51
@@ -4193,17 +4385,21 @@ function mainView()
     end
     
     gui.Results[i].result:setStyle("search_txt")
-
+    function a_result_names()end
+    name = name:gsub("\\([\'\"])", "%1"):gsub("\\\\", "\\")
     local name1, name2
     if fx_type ~= "AU" and fx_type ~= "AUi" then
       name1, name2 = name:match("(.-) (%(.+)")
     else
       name2, name1 = name:match("(.-):%s(.+)")
+      name2 = name1:match(" %(.+") and "(" .. name2 .. ")" .. name1:match(" %(.+") .. ")" or name2
+      name1 = name1:gsub(" %(.+", "")
     end
     if not name1 then
-      name1, name2 = name, fx_type:match("VST") and "" or path
+      name1, name2 = name, fx_type:match("VST") and "" or path:match("(.+)/")
     else
-      name2 = name2:gsub("%) %(", " | "):gsub("[%(%)]", ""):upper()
+      name2 = name2:gsub("%) ?%(\\t", " •• "):gsub(" ?%(\\t", "•• "):gsub("%) %(", " | "):gsub("[%(%)]", ""):upper()
+      --name2 = name2:match("^/") and name2:gsub("(.+|)(.+)", function(a,b)return a .. b:upper()end) or name2:upper()
     end
     name1 = name1:gsub("/%(", "("):gsub("%)/", ")"):gsub("^.", string.upper)
     gfx.setfont(5)
@@ -4724,32 +4920,31 @@ gui.prefs_page = function(page)
     gui.Prefs.Body.Section_3.Cb_2:drawCb("Clear search box after insertion")
     
     -- SEARCH ACTION LIST
-    
-    gui.Prefs.Body.Section_3.Cb_3 = gui.Prefs.Body.Section_1.Cb:setChild({
-                                         id = "cb_act_search",
-                                         float_b = gui.Prefs.Body.Section_3.Cb_1,
-                                         --float_r = gui.Prefs.Body.Section_3.Cb_1,
-                                         }, nil, nil, padding, padding)
-      
-    gui.Prefs.Body.Section_3.Cb_3:drawRect():setStyle("search")
-    gui.Prefs.Body.Section_3.Cb_3:drawCb("Search the action list")
-    
-    -- FLOAT FX AT MOUSE CURSOR
-    if reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M") > 0 then
-      gui.Prefs.Body.Section_3.Cb_4 = gui.Prefs.Body.Section_1.Cb:setChild({
-                                           id = "cb_float_at_mouse",
+    if reaper.CF_EnumerateActions then
+      gui.Prefs.Body.Section_3.Cb_3 = gui.Prefs.Body.Section_1.Cb:setChild({
+                                           id = "cb_act_search",
                                            float_b = gui.Prefs.Body.Section_3.Cb_1,
-                                           float_r = gui.Prefs.Body.Section_3.Cb_1,
+                                           --float_r = gui.Prefs.Body.Section_3.Cb_1,
                                            }, nil, nil, padding, padding)
         
-      gui.Prefs.Body.Section_3.Cb_4:drawRect():setStyle("search")
-      gui.Prefs.Body.Section_3.Cb_4:drawCb("Float FX at mouse cursor")
+      gui.Prefs.Body.Section_3.Cb_3:drawRect():setStyle("search")
+      gui.Prefs.Body.Section_3.Cb_3:drawCb("Search the action list")
     end
+    
+    -- SEARCH FX FOLDERS
+    gui.Prefs.Body.Section_3.Cb_4 = gui.Prefs.Body.Section_1.Cb:setChild({
+                                         id = "cb_fol_search",
+                                         float_b = gui.Prefs.Body.Section_3.Cb_1,
+                                         float_r = gui.Prefs.Body.Section_3.Cb_1,
+                                         }, nil, nil, padding, padding)
+      
+    gui.Prefs.Body.Section_3.Cb_4:drawRect():setStyle("search")
+    gui.Prefs.Body.Section_3.Cb_4:drawCb("Search FX browser folders")
     
     -- DEFAULT MODE
     
     gui.Prefs.Body.Section_3.Default_mode = gui.Prefs.Body.Section_1.Caption:setChild({
-                                             float_b = gui.Prefs.Body.Section_3.Cb_3,
+                                             float_b = gui.Prefs.Body.Section_3.Cb_4,
                                              },
                                              nil, nil, padding)
     gui.Prefs.Body.Section_3.Default_mode.txt_align = gui.txt_align["vert"]
@@ -4765,7 +4960,7 @@ gui.prefs_page = function(page)
                                           direction = "float_t",
                                           --y_reset = (gui.wnd_h - gui.Prefs.Body.Section_1.dd.h *
                                           --(#gui.lists.mode + 1)) +gui.Prefs.Body.Section_1.dd.h ,
-                                          float_b = gui.Prefs.Body.Section_3.Cb_3,
+                                          float_b = gui.Prefs.Body.Section_3.Cb_4,
                                           float_r = gui.Prefs.Body.Section_3.Default_mode},
                                           nil, nil, padding)
     
@@ -4774,7 +4969,7 @@ gui.prefs_page = function(page)
     -- RESULT ROWS
     
     gui.Prefs.Body.Section_3.Result_rows = gui.Prefs.Body.Section_1.Caption:setChild({
-                                             float_b = gui.Prefs.Body.Section_3.Cb_3,
+                                             float_b = gui.Prefs.Body.Section_3.Cb_4,
                                              float_r = gui.Prefs.Body.Section_3["dd_1"]
                                              }, nil, nil, padding * 2, padding)
     gui.Prefs.Body.Section_3.Result_rows.txt_align = gui.txt_align["vert"]
@@ -4788,7 +4983,7 @@ gui.prefs_page = function(page)
                                           w = gui.Prefs.Body.Section_1.dd.h,
                                           h = gui.Prefs.Body.Section_1.dd.h,
                                           --pad_y = os_is.mac and 0 or 1 * config.multi,
-                                          float_b = gui.Prefs.Body.Section_3.Cb_3,
+                                          float_b = gui.Prefs.Body.Section_3.Cb_4,
                                           float_r = gui.Prefs.Body.Section_3.Result_rows}, nil, nil, padding)
       gui.Prefs.Body.Section_3.Results_max:setStyle("dd"):drawRect()
       gui.Prefs.Body.Section_3.Results_max.c = gui.Prefs.Body.Section_3.Results_max.c - 52
@@ -4854,9 +5049,15 @@ gui.prefs_page = function(page)
                                             float_b = gui.Prefs.Body.Section_4.Title,
                                             float_r = gui.Prefs.Body.Section_4["dd_1"]},
                                             nil, nil, padding * 2, padding)
-    
+    if get_db then
+      gui.Prefs.Body.Section_4.Refresh_bttn.c = config.theme == "light" and gui.bg_hue or 200
+    end
     gui.Prefs.Body.Section_4.Refresh_bttn:drawRect()
     gui.Prefs.Body.Section_4.Refresh_bttn.c = gui.Prefs.Body.Section_4.Refresh_bttn.c - 52
+    if get_db then
+      gui.Prefs.Body.Section_4.Refresh_bttn.c = gui.bg_hue
+      gui.Prefs.Body.Section_4.Refresh_bttn.font_c = config.theme == "light" and 255 or gui.bg_hue
+    end
     gui.Prefs.Body.Section_4.Refresh_bttn:drawBorder():drawTxt(get_db and "Refreshing... " or "Force Refresh")
         
     
@@ -5067,7 +5268,8 @@ function prefsView()
 end
 
 function getMobj()
-  if gui.m_cap&mouse_mod.lmb == 1 and gui.active and gui.active.id:match("^result") and
+  if gui.m_cap&mouse_mod.lmb == 1 and gui.m_cap ~= 25 and gui.m_cap ~= 29 and
+     gui.active and gui.active.id:match("^result") and
      #scr.results_list > 0 and not scr.results_list[gui.Results.sel]:match("^ACTION") then
     if gui.m_x_click ~= gui.m_x or gui.m_y_click ~= gui.m_y then
       if reaper.JS_Mouse_LoadCursor then
@@ -5113,6 +5315,7 @@ function getExt()
   end
   gui.Row1 = {h = math.floor(gui.row_h * 0.5)}
   gui.wnd_h = 200 * config.multi
+  gui.wnd_w = 400 * config.multi
   local sws = reaper.CF_EnumerateActions and 1 or 0
   local js = reaper.JS_Mouse_LoadCursor and 1 or 0
   local api = ((sws == "" or js == "") and " API.") or " APIs."
@@ -5185,6 +5388,91 @@ function guiDock()
   gui.reopen = true
 end
 
+function floatModePopUp()
+  gfx.x = gui.Row1.Float.x1
+  gfx.y = gui.Row1.Float.y1
+  local str = "#FX show options||" ..
+        (config.float_mode == 2 and "!" or "") .. "Always in FX chain|" ..
+        (config.float_mode == 3 and "!" or "") .. "Always float|" ..
+        ((not config.float_mode or config.float_mode == 4) and "!" or "") .. "Auto (context dependent)" ..
+        (reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_R_V_M") > 0 and
+        ((config.float_at_mouse and "||!" or "||") .. "Show FX at mouse cursor") or "")
+  retval = gfx.showmenu(str)
+  if retval > 0 and retval < 5 then
+    config.float_mode = retval
+  elseif retval == 5 then
+    if config.float_at_mouse then
+      config.float_at_mouse = nil
+    else
+      config.float_at_mouse = true
+    end
+  end
+end
+
+function filterTrayPopUp()
+  gfx.x = gui.Row2.dd_Mode.x1
+  gfx.y = gui.Row2.dd_Mode.y1
+  local str = "#Search Filter Tray items||"
+  local filter_items = {}
+  for k, v in pairs(filter_modes) do
+    table.insert(filter_items, k)
+  end
+  
+  filter_items = sortAbc(filter_items)
+   
+  for i = 1, #filter_items do
+    local k = filter_items[i]
+    if k == "ACTION" then
+      k = "ACT (actions)"
+    elseif k == "ALL" then
+      k = "ALL (full database)"
+    elseif k == "CHAIN" then
+      k = "CH (FX chains)"
+    elseif k == "FAV" then
+      k = "FAV (favorites)"
+    elseif k == "FOLDER" then
+      k = "FOL (FX browser folders)"
+    elseif k == "FX" then
+      k = "FX (effects)"
+    elseif k == "INSTRUMENT" then
+      k = "INS (virtual instruments)"
+    elseif k == "JS" then
+      k = "JS (everything JS)"
+    elseif k == "TEMPLATE" then
+      k = "TT (track templates)"
+    elseif k == "VST2" then
+      k = "VST2 (everything VST2)"
+    elseif k == "VST3" then
+      k = "VST3 (everything VST3)"
+    elseif k == "AU" then
+      k = "AU (everything AU)"
+    end
+    str = str .. (filter_modes[filter_items[i]] and "!" or "") .. k .. "|"
+  end
+  
+  str = str .. "|Show all filters"
+  
+  local retval = gfx.showmenu(str)
+  if retval == #filter_items + 2 then
+    for k, v in pairs(filter_modes) do
+      filter_modes[k] = true
+    end
+    defineFilterModes()
+    scr.filter_n = countFilterModes()
+  elseif retval > 0 then
+    local filter_modes_on = 0
+    for k, v in pairs(filter_modes) do
+      if v then filter_modes_on = filter_modes_on + 1 end
+    end
+    local key = filter_items[retval-1]:match("[^!]+")
+    local state = not filter_modes[key]
+    if filter_modes_on == 1 and not state then return end
+    filter_modes[key] = not filter_modes[key]
+    defineFilterModes()
+    scr.filter_n = countFilterModes()
+  end
+end
+
 function a_main()end
 function main()
   if reaper.GetExtState("Quick Adder", "MSG") == "reopen" then
@@ -5242,6 +5530,10 @@ function main()
     elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == ("hints" or "nav") then -- if right click
       --themeSwitch()
       guiDock()
+    elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == "dd_1_mode" then
+      filterTrayPopUp()
+    elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == "float" then
+      floatModePopUp()  
     end
     gui.clicked = nil
   end
