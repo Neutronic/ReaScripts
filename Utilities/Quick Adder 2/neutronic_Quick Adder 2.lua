@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.25
+Version: 2.26
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,6 +10,9 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
+  # fix script crash when parsing fxfolders.ini
+
+  New in v2.25
   + search FX browser folders
   + new FOL search filter for FX browser folders
   + option to disable FX folders searching (PREFS --> Search and ...)
@@ -529,7 +532,7 @@ end
 
 if reaper.CF_EnumerateActions then
   config.act_search = config.act_search
-  filter_modes.ACTION = config.act_search or nil
+  --filter_modes.ACTION = config.act_search or nil
 else
   config.act_search = nil
   filter_modes.ACTION = nil
@@ -842,16 +845,17 @@ function getDb(refresh)
           
           if fx_folders_ini then
             fx_folders = {}
-            for match in fx_folders_ini:gmatch("Name.-\n") do
+            local folder_names = fx_folders_ini:match("%[Folders%].+")
+            for match in folder_names:gmatch("Name%d+=.-\n") do
               local n, name = match:match("Name(%d+)=(.+)\n")
               fx_folders[n+1] = {name = name}
+              ::SKIP::
             end
           
             for match in fx_folders_ini:gmatch("%[.-%d+%].-\n\n") do
               local n, content = match:match("%[.-(%d+)%](.+)\n")
               fx_folders[n+1].content = content
             end
-            
             fx_folders_ini = nil
           end
         end
@@ -1958,8 +1962,9 @@ end
 scr.filter_n = countFilterModes()
 
 function getMainW(get_w, relevant_filters)
+  local filter_n = scr.filter_n >=9 and scr_filter_n or 9
   local w = (gui.row_h - 4 * math.floor(config.multi)) * 
-             scr.filter_n + 5 * math.floor(config.multi) + gui.border * 2
+             filter_n + 5 * math.floor(config.multi) + gui.border * 2
   if get_w then return w end
   return scr.main_w_rs or config.main_w_rs or w 
 end
@@ -4452,7 +4457,7 @@ function mainView()
   end
   
   gui.Row2.Search:textBox(gui.ch, gui.Row2.Search.Clear.w)
-  if gui.str == "" then
+  if gui.str == "" and not gui.focused then
     gui.Row2.Search.font_c = gui.Row2.Search.font_c + (config.theme == "light" and 100 or -100)
     gui.Row2.Search.pad_x = gui.Row2.Search.pad_x + 3
     gui.Row2.Search.pad_y = 1 * math.floor(config.multi)
