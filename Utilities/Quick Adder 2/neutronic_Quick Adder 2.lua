@@ -1962,7 +1962,7 @@ end
 scr.filter_n = countFilterModes()
 
 function getMainW(get_w, relevant_filters)
-  local filter_n = scr.filter_n >=9 and scr_filter_n or 9
+  local filter_n = scr.filter_n >=9 and scr.filter_n or 9
   local w = (gui.row_h - 4 * math.floor(config.multi)) * 
              filter_n + 5 * math.floor(config.multi) + gui.border * 2
   if get_w then return w end
