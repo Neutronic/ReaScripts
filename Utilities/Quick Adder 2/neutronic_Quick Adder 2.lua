@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.26
+Version: 2.27
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,8 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fix script crash when parsing fxfolders.ini
+  # fix recalling favorites containing FX folder data
+  # improve matching queries with numbers
 
   New in v2.25
   + search FX browser folders
@@ -224,7 +225,7 @@ function magicFix(str)
 end
 
 function escSeqFix(str)
-  return str:gsub("[\a\b\f\n\r\t\v\0]", ""):gsub("[\'\"\\]", "\\%0")
+  return str:gsub("[\a\b\f\n\r\v\0]", ""):gsub("[\'\"\\]", "\\%0")
 end
 
 function a_macYoffset()end
@@ -849,7 +850,6 @@ function getDb(refresh)
             for match in folder_names:gmatch("Name%d+=.-\n") do
               local n, name = match:match("Name(%d+)=(.+)\n")
               fx_folders[n+1] = {name = name}
-              ::SKIP::
             end
           
             for match in fx_folders_ini:gmatch("%[.-%d+%].-\n\n") do
@@ -1520,10 +1520,11 @@ function getResultsList(fx_type, fx_only, ins_only)
       goto LOOP_END
     end
     for m = 1, #scr.query_parts do
+      local query = scr.query_parts[m]
       --
-      if scr.query_parts[m]:match("^/") then goto PART_SKIP end -- if flag
-      
-      exclude, exclude_word = string.match(scr.query_parts[m], "^(%%%-)(.+)")
+      if query:match("^/") then goto PART_SKIP end -- if flag
+ 
+      exclude, exclude_word = query:match("^(%%%-)(.+)")
       --
       if exclude then
         part_match = l:match(exclude_word) --:lower()
@@ -1535,7 +1536,8 @@ function getResultsList(fx_type, fx_only, ins_only)
         end
       else
         local exact = gui.str:match("\".*\"") and "[%W]" or ""
-        part_match = l:match(exact..scr.query_parts[m])
+        part_match = (query:match("^%d+$") and l:match("^.-:(.+)") or l):match(exact .. query)
+        --part_match = l:match(exact .. query)
         if not part_match then break end
       end
       ::PART_SKIP::
