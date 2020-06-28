@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="549609fd04e20df56d0a466cbaee4f387af670bf">
+<index version="1" name="Neutronic Scripts" commit="4f6d07638fab420a6cc28777b75ab48e6a6d8d10">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -411,6 +411,27 @@ New in v2.25
 # improve illegal characters sanitizing
 # internal optimizations]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/549609fd04e20df56d0a466cbaee4f387af670bf/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.29" author="Neutronic" time="2020-06-28T21:58:28Z">
+        <changelog><![CDATA[+ Shift+Enter inserts templates above first selected track
+# more improvements to reaper-fxfolders.ini parsing
+# check VST names for illegal characters
+# improve overall character sanitizing logic
+# fix script crash if AU match doesn't have a space between developer and plugin names
+# improve INS/FOL filters logic
+
+New in v2.25
++ search FX browser folders
++ new FOL search filter for FX browser folders
++ option to disable FX folders searching (PREFS --> Search and ...)
++ new INS search filter for virtual instruments
++ FX search filter now gets effects only
++ configure Filter Tray items (right-click the tray button)
++ configure FX show options (right-click the Show FX button)
+# move "Show FX at mouse cursor" to FX show options
+# improve illegal characters sanitizing
+# internal optimizations]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/4f6d07638fab420a6cc28777b75ab48e6a6d8d10/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
