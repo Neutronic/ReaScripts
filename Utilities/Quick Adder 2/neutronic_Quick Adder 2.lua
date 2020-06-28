@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.28
+Version: 2.29
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -13,8 +13,9 @@ Changelog:
   + Shift+Enter inserts templates above first selected track
   # more improvements to reaper-fxfolders.ini parsing
   # check VST names for illegal characters
+  # improve overall character sanitizing logic
   # fix script crash if AU match doesn't have a space between developer and plugin names
-  # improved INS/FOL filters logic
+  # improve INS/FOL filters logic
 
   New in v2.25
   + search FX browser folders
@@ -264,7 +265,7 @@ function tableToString(name, tbl, escape)
   
   function valueParse(v)
     if type(v) == "string" then
-      return '"' .. (escape and escSeqFix(v) or v) ..  '"'
+      return '"' .. escSeqFix(v) ..  '"'
     elseif type(v) == "boolean" then
       return tostring(v)
     else
@@ -338,7 +339,7 @@ function listFiles(path, ext)
     local file = reaper.EnumerateFiles(path, i)
     if not file then break end
     
-    file = escSeqFix(file)
+    --file = escSeqFix(file)
     
     if file:match("[^%.]-$") == ext then
       if ext == "RfxChain" and not path:match("/FXChains/") then goto SKIP end
@@ -1351,10 +1352,9 @@ function getVst()
     
     local fx_folder = getFXfolder(vst_id .. "//" .. vst_file, 3)
     
-    vst_name = escSeqFix(vst_name)
+    --vst_name = escSeqFix(vst_name)
     local val = fx_type .. vst_name .. fx_folder .. "|,|" .. vst_file .. "|,|" .. vst_i .. "|,|" .. vst_id .. "|,|"
-    vst_name = escSeqFix(vst_name)
-    
+ 
     table.insert(sub_tbl, val)
     ::SKIP::
   end
@@ -1378,7 +1378,7 @@ function getJs()
       if rpr.def_fx_filt and not fxExclCheck("js:" .. js_name:lower(), true) then goto SKIP end
       local fx_folder = getFXfolder(path, 2)
       
-      js_name = escSeqFix(js_name)
+      --js_name = escSeqFix(js_name)
       table.insert(db.JS, "JS:" .. js_name .. fx_folder .. "|,|" .. path .. "|,||,||,|")
     end
     ::SKIP::
@@ -1405,7 +1405,7 @@ function getAu()
         
         local fx_folder = getFXfolder(au_name, 5)
         
-        au_name = escSeqFix(au_name)
+        --au_name = escSeqFix(au_name)
         table.insert(db.AU, "AU" .. au_i .. ":" .. au_name .. fx_folder .. "|,||,|" .. au_i .. "|,||,|")
       end
     end
@@ -1428,7 +1428,7 @@ function getAction()
     i = i + 1
     if name ~= "" then
       local id_named = reaper.ReverseNamedCommandLookup(id) or ""
-      name = escSeqFix(name)
+      --name = escSeqFix(name)
       
       local act = "ACTION:" .. name .. "|,|" .. id_named .. "|,|" ..
             section[n].name .. "/" .. section[n].id .. "|,|" .. id .. "|,|"
@@ -4412,7 +4412,7 @@ function mainView()
     
     gui.Results[i].result:setStyle("search_txt")
     function a_result_names()end
-    name = name:gsub("\\([\'\"])", "%1"):gsub("\\\\", "\\")
+    --name = name:gsub("\\([\'\"])", "%1"):gsub("\\\\", "\\")
     local name1, name2
     if fx_type ~= "AU" and fx_type ~= "AUi" then
       name1, name2 = name:match("(.-) (%(.+)")
