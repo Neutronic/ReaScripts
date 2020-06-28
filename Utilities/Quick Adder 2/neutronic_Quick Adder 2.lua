@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.27
+Version: 2.28
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,8 +10,11 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fix recalling favorites containing FX folder data
-  # improve matching queries with numbers
+  + Shift+Enter inserts templates above first selected track
+  # more improvements to reaper-fxfolders.ini parsing
+  # check VST names for illegal characters
+  # fix script crash if AU match doesn't have a space between developer and plugin names
+  # improved INS/FOL filters logic
 
   New in v2.25
   + search FX browser folders
@@ -290,14 +293,14 @@ function getFXfolder(str, type_n)
   if type_n == 3 then -- if VST
     local vst_id, vst_file = str:match("(.-)//(.+)")
     for i = 1, fx_folders and #fx_folders or 0 do
-      if fx_folders[i].content:match(vst_id) or
-         fx_folders[i].content:gsub("[^%w%.]", "_"):match(vst_file) then
+      if fx_folders[i].content and (fx_folders[i].content:match(vst_id) or
+         fx_folders[i].content:gsub("[^%w%.\n\r]", "_"):match(vst_file .. "[\n\r]")) then
         fx_folder = fx_folder .. "\t" .. fx_folders[i].name
       end
     end
   else
     for i = 1, fx_folders and #fx_folders or 0 do
-      if fx_folders[i].content:match("Item%d+=" .. magicFix(str)) then
+      if fx_folders[i].content and fx_folders[i].content:match("Item%d+=" .. magicFix(str)) then
         local fx_n = fx_folders[i].content:match("Item(%d+)=" .. magicFix(str))
         if fx_folders[i].content:match("Type" .. fx_n .. "=" .. type_n) then
           fx_folder = fx_folder .. "\t" .. fx_folders[i].name
@@ -513,6 +516,7 @@ if config.act_search == nil and reaper.CF_EnumerateActions then
   global_types.ACTION = true
   config.global_types_n = config.global_types_n + 1
   table.insert(global_types_order, "ACTION")
+  if filter_modes then filter_modes.ACTION = true end
 end
 
 if not filter_modes then
@@ -534,7 +538,7 @@ end
 if reaper.CF_EnumerateActions then
   config.act_search = config.act_search
   --filter_modes.ACTION = config.act_search or nil
-else
+elseif config.act_search then
   config.act_search = nil
   filter_modes.ACTION = nil
   global_types.ACTION = nil
@@ -842,18 +846,19 @@ function getDb(refresh)
         _timers.db_defer = nil
         
         if config.fol_search then
-          local fx_folders_ini = getContent(rpr.fx_folders)
+          local fx_folders_ini = getContent(rpr.fx_folders) .. "\n\n"
           
           if fx_folders_ini then
             fx_folders = {}
-            local folder_names = fx_folders_ini:match("%[Folders%].+")
+            local folder_names = fx_folders_ini:match("%[Folders%](.-)\n[\n%[]")
             for match in folder_names:gmatch("Name%d+=.-\n") do
               local n, name = match:match("Name(%d+)=(.+)\n")
               fx_folders[n+1] = {name = name}
             end
+            
           
-            for match in fx_folders_ini:gmatch("%[.-%d+%].-\n\n") do
-              local n, content = match:match("%[.-(%d+)%](.+)\n")
+            for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
+              local n, content = match:match("Folder(%d+)%](.+)")
               fx_folders[n+1].content = content
             end
             fx_folders_ini = nil
@@ -980,7 +985,7 @@ function doAdd()
       scr.result_is_action = true
     end
   elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") == "TEMPLATE" and
-     ((gui.m_cap == 0 or gui.m_cap == mouse_mod.clear) or
+     ((gui.m_cap == 0 or gui.m_cap == mouse_mod.clear or gui.m_cap == mouse_mod.shift) or
      gui.m_cap == mouse_mod.lmb or m_obj) then
     ttAdd(scr.results_list[gui.Results.sel])
   elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") ~= "TEMPLATE" then
@@ -1346,6 +1351,7 @@ function getVst()
     
     local fx_folder = getFXfolder(vst_id .. "//" .. vst_file, 3)
     
+    vst_name = escSeqFix(vst_name)
     local val = fx_type .. vst_name .. fx_folder .. "|,|" .. vst_file .. "|,|" .. vst_i .. "|,|" .. vst_id .. "|,|"
     vst_name = escSeqFix(vst_name)
     
@@ -1448,10 +1454,8 @@ function doMatch()
     getResultsListFav(nil, true)
     matchType(true)
   elseif config.mode == "INSTRUMENT" then
-    getResultsListFav(nil, nil, true)
-    getResultsList("VST2", nil, true)
-    getResultsList("VST3", nil, true)
-    if os_is.mac then getResultsList("AU", nil, true) end
+    getResultsListFav()
+    matchType()
   elseif config.mode == "FAV" then
     getResultsListFav()
     getResultsList("FAV")
@@ -1469,20 +1473,20 @@ function doMatch()
   end 
 end
 
-function getResultsListFav(fx_type, fx_only, ins_only)
+function getResultsListFav(fx_type, fx_only)
   if gui.str ~= "" then return end
   for i, v in ipairs(db.FAV) do
     local l = v:match("(.-)|,|.+"):lower()
     if fx_type then
       fx_type_match = l:match("^" .. fx_type:lower())
       if not fx_type_match then goto SKIP end
-   elseif fx_only then
-      if l:match("^chain") or l:match("^template") or l:match("^action") or
-         config.mode == "FOLDER" and not l:match("\t.+") or
-         config.mode == "FX" and l:match("^%w-i:") then
+    elseif fx_only then
+      if (l:match("^chain") or l:match("^template") or l:match("^action") or
+          l:match("^%w-i:")) and config.mode == "FX" or
+          config.mode == "FOLDER" and not l:match("\t.+") then
         goto SKIP
       end
-    elseif ins_only and not l:match("^%w+i:") then
+    elseif config.mode == "INSTRUMENT" and not l:match("^%w+i:") then
       goto SKIP
     end
     
@@ -1497,7 +1501,7 @@ function getResultsListFav(fx_type, fx_only, ins_only)
   end
 end
 
-function getResultsList(fx_type, fx_only, ins_only)
+function getResultsList(fx_type, fx_only)
   if gui.str == "" then return end
   if fx_type == "FAV" and config.mode ~= "ALL" and config.mode ~= "FOLDER" and
      config.mode ~= "FX" and config.mode ~= "FAV" and
@@ -1511,12 +1515,12 @@ function getResultsList(fx_type, fx_only, ins_only)
     if not l then goto LOOP_END end
     l = l:lower()
     if fx_only then
-      if l:match("^chain") or l:match("^template") or l:match("^action") or
-         config.mode == "FOLDER" and not l:match("\t.+") or
-         config.mode == "FX" and l:match("^%w-i:") then
+      if (l:match("^chain") or l:match("^template") or l:match("^action") or
+          l:match("^%w-i:")) and config.mode == "FX" or
+          config.mode == "FOLDER" and not l:match("\t.+") then
         goto LOOP_END
       end
-    elseif ins_only and not l:match("^%w+i:") then
+    elseif config.mode == "INSTRUMENT" and not l:match("^%w+i:") then
       goto LOOP_END
     end
     for m = 1, #scr.query_parts do
@@ -1754,17 +1758,32 @@ function ttAdd(v)
   end
   
   reaper.Undo_BeginBlock()
-  if m_obj then
+  if m_obj or gui.m_cap&mouse_mod.shift > 0 then
       reaper.PreventUIRefresh(1)
-        if type(m_obj) == "string" then  
+        if type(m_obj) == "string" then
           pcall(reaper.SetOnlyTrackSelected,reaper.GetTrack(0, reaper.CountTracks() - 1))
           ttInsert()
         elseif apply then
           ttApply(track_template, sel_tr_count)
-        else
-          ttInsert()
-          if reaper.ValidatePtr2(0, m_obj, "MediaTrack*") then  
-            reaper.ReorderSelectedTracks(reaper.CSurf_TrackToID(m_obj, false)-1, 0)
+        elseif m_obj or gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
+          local tr = m_obj or reaper.GetSelectedTrack(0, 0)
+          local sel_trs = {}
+          for i = 1, template_inst or 1 do
+            ttInsert()
+            if reaper.ValidatePtr2(0, m_obj, "MediaTrack*") or
+               gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
+              reaper.ReorderSelectedTracks(reaper.CSurf_TrackToID(tr, false)-1, 0)
+            end
+            sel_trs[#sel_trs+1] = reaper.GetSelectedTrack(0, 0)
+          end
+          for i = 1, #sel_trs do
+            reaper.SetMediaTrackInfo_Value(sel_trs[i], "I_SELECTED", 1)
+            if i > 1 and not config.fx_hide then
+              reaper.TrackFX_Show(sel_trs[i], -1, 0)
+              for n = 0, reaper.TrackFX_GetCount(sel_trs[i]) - 1 do
+                reaper.TrackFX_Show(sel_trs[i], n, 2)
+              end
+            end
           end
         end
       reaper.PreventUIRefresh(-1)
@@ -4398,7 +4417,7 @@ function mainView()
     if fx_type ~= "AU" and fx_type ~= "AUi" then
       name1, name2 = name:match("(.-) (%(.+)")
     else
-      name2, name1 = name:match("(.-):%s(.+)")
+      name2, name1 = name:match("(.-):%s?(.+)")
       name2 = name1:match(" %(.+") and "(" .. name2 .. ")" .. name1:match(" %(.+") .. ")" or name2
       name1 = name1:gsub(" %(.+", "")
     end
@@ -4459,7 +4478,7 @@ function mainView()
   end
   
   gui.Row2.Search:textBox(gui.ch, gui.Row2.Search.Clear.w)
-  if gui.str == "" and not gui.focused then
+  if gui.str == "" and (not gui.focused or gui.Row2.dd_Mode.direction == "float_b") then
     gui.Row2.Search.font_c = gui.Row2.Search.font_c + (config.theme == "light" and 100 or -100)
     gui.Row2.Search.pad_x = gui.Row2.Search.pad_x + 3
     gui.Row2.Search.pad_y = 1 * math.floor(config.multi)
@@ -5589,7 +5608,7 @@ function main()
  
     if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) and
        config.no_sel_tracks < 3 then
-      if not scr.result_is_action then
+      if not scr.result_is_action and gui.m_cap ~= mouse_mod.shift + mouse_mod.alt then
         gui.reopen = true gui:init()
       else
         scr.result_is_action = nil
