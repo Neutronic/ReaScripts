@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.29
+Version: 2.30
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,12 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + Shift+Enter inserts templates above first selected track
-  # more improvements to reaper-fxfolders.ini parsing
-  # check VST names for illegal characters
-  # improve overall character sanitizing logic
-  # fix script crash if AU match doesn't have a space between developer and plugin names
-  # improve INS/FOL filters logic
+  # fix script crash if reaper-fxfolders.ini does not exist
 
   New in v2.25
   + search FX browser folders
@@ -847,22 +842,25 @@ function getDb(refresh)
         _timers.db_defer = nil
         
         if config.fol_search then
-          local fx_folders_ini = getContent(rpr.fx_folders) .. "\n\n"
+          local fx_folders_ini = getContent(rpr.fx_folders)
           
           if fx_folders_ini then
-            fx_folders = {}
+            fx_folders_ini = fx_folders_ini .. "\n\n"
             local folder_names = fx_folders_ini:match("%[Folders%](.-)\n[\n%[]")
-            for match in folder_names:gmatch("Name%d+=.-\n") do
-              local n, name = match:match("Name(%d+)=(.+)\n")
-              fx_folders[n+1] = {name = name}
-            end
+            if folder_names then
+              fx_folders = {}
+              for match in folder_names:gmatch("Name%d+=.-\n") do
+                local n, name = match:match("Name(%d+)=(.+)\n")
+                fx_folders[n+1] = {name = name}
+              end
+              
             
-          
-            for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
-              local n, content = match:match("Folder(%d+)%](.+)")
-              fx_folders[n+1].content = content
+              for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
+                local n, content = match:match("Folder(%d+)%](.+)")
+                fx_folders[n+1].content = content
+              end
+              fx_folders_ini = nil
             end
-            fx_folders_ini = nil
           end
         end
 
