@@ -4122,6 +4122,8 @@ end
 
 function a_guiParseResult()end
 function gui.parseResult(str)
+  if not str then return "", "", "", "", "", "" end
+  
   local fx_type, name, path, i, id, fav = str:match("(.-):(.-)|,|(.-)|,|(.-)|,|(.-)|,|(.*)")
   
   if fx_type == "JS" then
