@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.30
+Version: 2.31
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fix script crash if reaper-fxfolders.ini does not exist
+  # better handling of empty strings in getFXfolder() and fxExclCheck()
 
   New in v2.25
   + search FX browser folders
@@ -284,6 +284,9 @@ end
 
 function getFXfolder(str, type_n)
   local fx_folder = ""
+  
+  if not str then return fx_folder end
+  
   if config and not config.fol_search then return fx_folder end
   
   if type_n == 3 then -- if VST
@@ -781,6 +784,7 @@ end
 
 function parseIniFxFilt(str)
   if not str then return end
+  
   str = str:gsub("AND", "")
   str = str:gsub("\"", "")
   local tbl = {excl = {}, incl = {}}
@@ -1300,8 +1304,10 @@ function waitTrack()
 end
 
 function fxExclCheck(str, include)
+  if not str then return end
   if include and #rpr.def_fx_filt.incl == 0 then return true end
   if not include and #rpr.def_fx_filt.excl == 0 then return false end
+  
   local tbl = include and rpr.def_fx_filt.incl or rpr.def_fx_filt.excl
   for i = 1, #tbl do
     local pass = nil
