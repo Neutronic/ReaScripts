@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.31
+Version: 2.32
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # better handling of empty strings in getFXfolder() and fxExclCheck()
+  # improve handling of filter strings with OR logical operator
 
   New in v2.25
   + search FX browser folders
@@ -784,10 +784,12 @@ end
 
 function parseIniFxFilt(str)
   if not str then return end
+  if str:match(" OR ") then return end
   
   str = str:gsub("AND", "")
   str = str:gsub("\"", "")
   local tbl = {excl = {}, incl = {}}
+  
   for match in str:gmatch("NOT %( .- %)%s") do
     local match_ins = match:match("NOT %( (.+ )%)")
     if match_ins:match("NOT") then return end
