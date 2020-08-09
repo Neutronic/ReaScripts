@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.32
+Version: 2.33
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,19 +10,12 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # improve handling of filter strings with OR logical operator
-
-  New in v2.25
-  + search FX browser folders
-  + new FOL search filter for FX browser folders
-  + option to disable FX folders searching (PREFS --> Search and ...)
-  + new INS search filter for virtual instruments
-  + FX search filter now gets effects only
-  + configure Filter Tray items (right-click the tray button)
-  + configure FX show options (right-click the Show FX button)
-  # move "Show FX at mouse cursor" to FX show options
-  # improve illegal characters sanitizing
-  # internal optimizations
+  + Ctrl(Cmd) + Shift + Alt + Enter: inserts FX or template on new track and
+  sends selected tracks (or track under mouse) to it
+  # streamline targeting logic
+  # update mouse cursor when switching views with key commands
+  # improve hints
+  # update help file
 --]]
 
 local rpr = {}
@@ -197,10 +190,11 @@ local mouse_mod = {ctrl = 4,
             [0] = "No Mod"
             }
             
-mouse_mod["clear"] = mouse_mod.ctrl
-mouse_mod["input"] = mouse_mod.shift
-mouse_mod["track"] = mouse_mod.no_mod
-mouse_mod["take"] = mouse_mod.alt
+mouse_mod.clear = mouse_mod.ctrl
+mouse_mod.input = mouse_mod.shift
+mouse_mod.track = mouse_mod.no_mod
+mouse_mod.take = mouse_mod.alt
+mouse_mod.dds = mouse_mod.ctrl + mouse_mod.shift + mouse_mod.alt -- drag and drop send
 local enter = os_is.mac and "Return" or "Enter"
 
 local keep_state_names = {
@@ -961,10 +955,40 @@ function getDb(refresh)
 end
 
 function isClearFx()
+  if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+    return false
+  end
   if gui.m_cap&mouse_mod.clear == mouse_mod.clear and not mouse_mod.reverse or
      gui.m_cap&mouse_mod.clear ~= mouse_mod.clear and mouse_mod.reverse then
     return true
   end
+end
+
+local cntSelTrs = function()
+  return reaper.CountSelectedTracks(0)
+end
+
+local cntTrs = function()
+  return reaper.CountTracks(0)
+end
+
+local getTr = function(n)
+  return reaper.GetTrack(0, n)
+end
+
+local getSelTr = function(n)
+  return reaper.GetSelectedTrack(0, n)
+end
+
+function getSelectedTracks()
+  local tbl = {}
+  
+  for i = 0, cntSelTrs() - 1 do
+    local tr = getSelTr(i)
+    table.insert(tbl, tr)
+  end
+  
+  return tbl
 end
 
 function doAdd()
@@ -989,30 +1013,26 @@ function doAdd()
       reaper.JS_Window_OnCommand(ME, id)
       scr.result_is_action = true
     end
-  elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") == "TEMPLATE" and
-     ((gui.m_cap == 0 or gui.m_cap == mouse_mod.clear or gui.m_cap == mouse_mod.shift) or
-     gui.m_cap == mouse_mod.lmb or m_obj) then
-    ttAdd(scr.results_list[gui.Results.sel])
-  elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") ~= "TEMPLATE" then
+  elseif scr.results_list[gui.Results.sel]:match("^(%w+).+") == "TEMPLATE" then
+    if gui.m_cap == 0 or gui.m_cap == mouse_mod.shift + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.lmb or m_obj then
+      ttAdd(scr.results_list[gui.Results.sel])
+    end
+  else
+    if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+      scr.create_send = true
+    end
     local m_obj_is_tr = reaper.ValidatePtr2(0, m_obj, "MediaTrack*")
     local m_obj_is_tk = reaper.ValidatePtr2(0, m_obj, "MediaItem_Take*")
-    if gui.m_cap == mouse_mod.track and not m_obj or
-       gui.m_cap == mouse_mod.lmb or
-       gui.m_cap == mouse_mod.track + mouse_mod.clear and not m_obj_is_tk or
-       gui.m_cap == mouse_mod.lmb + mouse_mod.clear or
-       gui.m_cap == mouse_mod.input or
-       gui.m_cap == mouse_mod.lmb + mouse_mod.input or
-       gui.m_cap == mouse_mod.input + mouse_mod.clear or
-       gui.m_cap == mouse_mod.lmb + mouse_mod.input + mouse_mod.clear or
+    if gui.m_cap&mouse_mod.take == 0 and not m_obj or
+       gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
        m_obj_is_tr or type(m_obj) == "string" then
       reaper.PreventUIRefresh(1)
         fxTrack()
       reaper.PreventUIRefresh(-1)
-    elseif gui.m_cap == mouse_mod.take or
-           gui.m_cap == mouse_mod.lmb + mouse_mod.take or
-           gui.m_cap == mouse_mod.take + mouse_mod.clear or
-           gui.m_cap == mouse_mod.lmb + mouse_mod.take + mouse_mod.clear or
-           m_obj_is_tk then
+    elseif gui.m_cap&mouse_mod.take == mouse_mod.take or m_obj_is_tk then
       reaper.PreventUIRefresh(1)
         fxItem()
       reaper.PreventUIRefresh(-1)  
@@ -1039,10 +1059,28 @@ function waitResult()
   end
 end
 
+function createTrackSend(origin_tr, dest_tr)
+  for i = 1, #origin_tr do
+    if origin_tr[i] == reaper.GetMasterTrack(0) then return end
+    reaper.CreateTrackSend(origin_tr[i], dest_tr)
+  end
+  reaper.Main_OnCommand(40293, 0) -- Track: View routing and I/O for current/last touched track
+  if reaper.JS_Window_GetForeground then
+    local wnd = reaper.JS_Window_GetForeground()
+    reaper.JS_Window_SetZOrder(wnd, "TOPMOST")
+    
+    if reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_M_V_M") > 0 then
+      reaper.Main_OnCommand(reaper.NamedCommandLookup("_BR_MOVE_WINDOW_TO_MOUSE_H_M_V_M"), 0)
+    end
+    scr.bypass_reopen = true
+  end
+end
+
 function fxTrack(sel_tr_count, is_m_sel)
   local sel_tr_count = sel_tr_count or reaper.CountSelectedTracks(0)
   local is_m_sel = is_m_sel or reaper.IsTrackSelected(m_track)
-  if sel_tr_count > 0 and not m_obj or is_m_sel or m_obj and type(m_obj) == "userdata" then
+  if not scr.create_send and (sel_tr_count > 0 and not m_obj or is_m_sel or m_obj and type(m_obj) == "userdata" and
+     gui.m_cap ~= mouse_mod.take) then
     reaper.Undo_BeginBlock()
       local name, undo_name, fx_i
        
@@ -1081,10 +1119,35 @@ function fxTrack(sel_tr_count, is_m_sel)
       waitResult()
   else
     wait_result = scr.results_list[gui.Results.sel]
-    if m_obj or config.no_sel_tracks == 2 then
+    
+    if m_obj or config.no_sel_tracks == 2 or (cntSelTrs() > 0 and
+       gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb)) then
+      if scr.create_send then scr.create_send = nil end
+      
+      local sel_tracks
+      
+      if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) and
+         type(m_obj) == "userdata" or cntSelTrs() > 0 then
+        scr.show_routing = true
+        if type(m_obj) == "userdata" and m_obj ~= reaper.GetMasterTrack(0) then
+          sel_tracks = {m_obj}
+          scr.m_obj = true
+        else
+          sel_tracks = getSelectedTracks()
+        end
+      end
+      
+      local idx = ((not m_obj and cntSelTrs() == 0) or type(m_obj) == "string") and
+                  cntTrs() or
+                  not m_obj and reaper.CSurf_TrackToID(getSelTr(0), false) - 1 or
+                  reaper.GetMediaTrackInfo_Value(m_obj, "IP_TRACKNUMBER") == -1 and 0 or
+                  reaper.GetMediaTrackInfo_Value(m_obj, "IP_TRACKNUMBER") - 1
+                  
+      reaper.InsertTrackAtIndex(idx, false)
+      local tr = getTr(idx)
+      
       if m_obj then gui.active = nil m_obj = nil end
-      reaper.InsertTrackAtIndex(reaper.CountTracks(0), false)
-      local tr = reaper.GetTrack(0, reaper.CountTracks(0)-1)
+      
       reaper.GetSetMediaTrackInfo_String(tr, "P_NAME",
                                          gui.parseResult(wait_result):match("(.-) ?%(") or
                                          gui.parseResult(wait_result):match(".+: (.+)") or
@@ -1095,10 +1158,18 @@ function fxTrack(sel_tr_count, is_m_sel)
         reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", 128+63<<5|0)
       end
       reaper.SetOnlyTrackSelected(tr)
-      local no_fx = fxTrack(1, false)
+ 
+      local no_fx = fxTrack(cntSelTrs(), false)
+      
+      if scr.show_routing then
+        createTrackSend(sel_tracks, tr)
+        scr.show_routing = nil
+        scr.m_obj = nil
+      end
+      
       if no_fx then reaper.DeleteTrack(tr) end
       return
-    elseif reaper.CountTracks(0) == 0 and config.no_sel_tracks == 1 then
+    elseif cntTrs() == 0 and config.no_sel_tracks == 1 then
       local answ = reaper.MB("There are no tracks in the project.\n" ..
                               "Do you want to insert tracks to put the FX on?", "REASCRIPT Query", 1)
       if answ == 1 then
@@ -1145,7 +1216,9 @@ function fxFlush(object, kind)
 end
 
 function isInput()
-  if gui.m_cap&mouse_mod.input == mouse_mod.input then
+  if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+    return false
+  elseif gui.m_cap&mouse_mod.input == mouse_mod.input then
     return true
   else
     return false
@@ -1743,8 +1816,10 @@ function ttAdd(v)
     end
   end
   
-  if config.tt_apply_reverse and gui.m_cap == mouse_mod.no_mod or
-     not config.tt_apply_reverse and gui.m_cap == mouse_mod.clear then
+  if config.tt_apply_reverse and gui.m_cap == mouse_mod.no_mod +
+     (gfx.mouse_cap&mouse_mod.lmb) or
+     not config.tt_apply_reverse and gui.m_cap == mouse_mod.clear +
+     (gfx.mouse_cap&mouse_mod.lmb) then
     apply = true
   end
   
@@ -1765,34 +1840,49 @@ function ttAdd(v)
   
   reaper.Undo_BeginBlock()
   if m_obj or gui.m_cap&mouse_mod.shift > 0 then
-      reaper.PreventUIRefresh(1)
-        if type(m_obj) == "string" then
-          pcall(reaper.SetOnlyTrackSelected,reaper.GetTrack(0, reaper.CountTracks() - 1))
+    reaper.PreventUIRefresh(1)
+      if type(m_obj) == "string" then
+        pcall(reaper.SetOnlyTrackSelected,reaper.GetTrack(0, reaper.CountTracks() - 1))
+        ttInsert()
+      elseif apply then
+        ttApply(track_template, sel_tr_count)
+      elseif m_obj or gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
+        local sel_tracks_init
+        if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) and not m_obj then
+          sel_tracks_init = getSelectedTracks()
+        else
+          sel_tracks_init = {m_obj}
+        end
+        
+        local tr = m_obj or reaper.GetSelectedTrack(0, 0)
+        local sel_trs = {}
+        for i = 1, template_inst or 1 do
           ttInsert()
-        elseif apply then
-          ttApply(track_template, sel_tr_count)
-        elseif m_obj or gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
-          local tr = m_obj or reaper.GetSelectedTrack(0, 0)
-          local sel_trs = {}
-          for i = 1, template_inst or 1 do
-            ttInsert()
-            if reaper.ValidatePtr2(0, m_obj, "MediaTrack*") or
-               gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
-              reaper.ReorderSelectedTracks(reaper.CSurf_TrackToID(tr, false)-1, 0)
-            end
-            sel_trs[#sel_trs+1] = reaper.GetSelectedTrack(0, 0)
+          if reaper.ValidatePtr2(0, m_obj, "MediaTrack*") or
+             gui.m_cap&mouse_mod.shift > 0 and sel_tr_count > 0 then
+            reaper.ReorderSelectedTracks(reaper.CSurf_TrackToID(tr, false)-1, 0)
           end
-          for i = 1, #sel_trs do
-            reaper.SetMediaTrackInfo_Value(sel_trs[i], "I_SELECTED", 1)
-            if i > 1 and not config.fx_hide then
-              reaper.TrackFX_Show(sel_trs[i], -1, 0)
-              for n = 0, reaper.TrackFX_GetCount(sel_trs[i]) - 1 do
-                reaper.TrackFX_Show(sel_trs[i], n, 2)
-              end
+          sel_trs[#sel_trs+1] = reaper.GetSelectedTrack(0, 0)
+        end
+        
+        for i = 1, #sel_trs do
+          reaper.SetMediaTrackInfo_Value(sel_trs[i], "I_SELECTED", 1)
+          if i > 1 and not config.fx_hide then
+            reaper.TrackFX_Show(sel_trs[i], -1, 0)
+            for n = 0, reaper.TrackFX_GetCount(sel_trs[i]) - 1 do
+              reaper.TrackFX_Show(sel_trs[i], n, 2)
             end
           end
         end
-      reaper.PreventUIRefresh(-1)
+        
+        if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) and
+           cntSelTrs() == 1 and (not m_obj or type(m_obj) == "userdata") then
+          local tr = getSelTr(0)
+          createTrackSend(sel_tracks_init, tr)
+        end
+        
+      end
+    reaper.PreventUIRefresh(-1)
   elseif apply then
     ttApply(track_template, sel_tr_count)
   else
@@ -1842,24 +1932,27 @@ function help()
   literal = true
   reaper.ClearConsole()
   reaper.ShowConsoleMsg([[
-Welcome to Quick Adder 2!
+Welcome to Quick Adder 2 user guide!
 
-The ReaScript is designed to provide a unified solution for adding track/take/input FX
-and track templates in REAPER. You can also run actions with the script.
+The extension is designed to provide a unified solution for adding track/take/input FX
+and track templates in REAPER. You can also run actions with the add-on.
 
 This is achieved through utilizing contextual key commands, which perform as follows:
   ]] .. enter .. [[ (double-click): adds track FX or track template and runs actions;
   ]]..
   mouse_mod[mouse_mod.clear]() .. " + " .. enter .. [[: clears FX chains before adding FX or applies track template; 
   ]]..
-  mouse_mod[mouse_mod.input]() .. " + " .. enter .. [[: adds input FX to selected tracks;
+  mouse_mod[mouse_mod.input]() .. " + " .. enter .. [[: adds input FX to selected tracks or inserts track templates above first selected track;
   ]]..
   mouse_mod[mouse_mod.clear]() .. " + " .. mouse_mod[mouse_mod.input]() .. " + " .. enter .. [[: clears input FX chain and adds FX;
   ]]..
   mouse_mod[mouse_mod.take]() .. " + " .. enter .. [[: adds FX to selected items' active takes;
   ]]..
-  mouse_mod[mouse_mod.clear]() .. " + " .. mouse_mod[mouse_mod.take]() .. " + " .. enter .. [[: clears take FX chains before adding FX.
-
+  mouse_mod[mouse_mod.clear]() .. " + " .. mouse_mod[mouse_mod.take]() .. " + " .. enter .. [[: clears take FX chains before adding FX;
+  ]]..
+  mouse_mod[mouse_mod.ctrl]() .. " + " .. mouse_mod[mouse_mod.shift]() .. " + " .. mouse_mod[mouse_mod.alt]() .. " + " ..
+  enter .. [[: inserts FX or template on a new track and sends selected tracks (or track under mouse) to it.
+  
 Quick Adder 2 also introduces an in-script favorites system.
 It will help you promote any search result to the top of the list.
 
@@ -1946,10 +2039,7 @@ end
 function parseQuery()
   local data = gui.str:lower()
    scr.query_parts = {}
-   --[[if isShorthand(config.mode, 2) then
-     table.insert(scr.query_parts, config.mode:lower())
-   end]]
-   
+ 
    local exact = data:match("\".-\"")
    
    if exact then
@@ -1961,14 +2051,12 @@ function parseQuery()
    
    local i = 0
    
-   for word in data:gmatch("[^%s]+") do --"[%w%p]+"
+   for word in data:gmatch("[^%s]+") do
      i = i + 1
   
      word = word:gsub("[\\\"]", "\\%1")
      word = magicFix(word)
-     --[[if word == "/t" or word == "/i" then
-       dest = word
-     end--]]
+
      table.insert(scr.query_parts, word)
    end
    if #scr.query_parts > 0 then scr.results_list = {} end
@@ -2581,7 +2669,7 @@ function gui:onClick()
 end
 
 function gui:onSelect()
-  if gui.m_cap == 25 or gui.m_cap == 29 then return end
+  if gui.m_cap == 25 then return end -- if Alt + Shift
   if (gui.m_cap&1 == 1) and not gui.active and not gui.click_ignore and
       self.on_select and not gui.selected and self.id then
     if gui.important and (gui.important:isOver() and gui.important.id ~= self.id or
@@ -2603,12 +2691,12 @@ function gui:onSelect()
       _timers.double_click = nil
     end
     
-  elseif gui.m_cap == 0 and self.on_select and gui.selected then
+  elseif gui.m_cap&1 == 0 and self.on_select and gui.selected then
     gui.active = nil
     gui.selected = nil
     gui.m_x_click = nil
     gui.m_y_click = nil
-  elseif gui.m_cap == 0 and gui.selected and gui.focused and not gui.focused:isOver() then
+  elseif gui.m_cap&1 == 0 and gui.selected and gui.focused and not gui.focused:isOver() then
     gui.selected = nil
   end
 end
@@ -3107,7 +3195,8 @@ function gui:textBox(ch, shrink)
     local search_delay = config.search_delay ~= 0 and config.search_delay or config.act_search and 0.05 or 0
     local r_pad = gui.border * math.floor(config.multi) * 3
     
-    if gui.m_cap&mouse_mod.ctrl == mouse_mod.ctrl then goto SKIP end
+    if gui.m_cap&mouse_mod.ctrl == mouse_mod.ctrl or 
+       gui.m_cap&mouse_mod.alt == mouse_mod.alt then goto SKIP end
     
     if ch ~= white_ch.bs then -- if not backspace and not CTRL
       if gui.txt_hl then
@@ -3996,24 +4085,23 @@ gui.hints.generate = function(id)
   
   if gui.view == "main" and #scr.results_list > 0 and gui.Results.sel then
     if config.ext_check then goto SKIP end
-    if gui.m_cap&mouse_mod.alt == mouse_mod.alt and
-       gui.m_cap&mouse_mod.shift == mouse_mod.shift and
+    if gui.m_cap == mouse_mod.alt + mouse_mod.shift and
        select(4, gui.parseResult(scr.results_list[gui.Results.sel])) ~= "" then
        gui.hints_txt = "Move the favorite up or down " ..
                        "[" .. mouse_mod[mouse_mod.alt]() .. " + "
                        .. mouse_mod[mouse_mod.shift]() .. " + Up/Down]"
        return
-    elseif gui.m_cap == mouse_mod.track + mouse_mod.clear and
+    elseif gui.m_cap == mouse_mod.track + mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Clear track FX chain and add FX " ..
                       "[" .. mouse_mod[mouse_mod.clear]() .. " + " .. enter .. "]"
       return
-    elseif gui.m_cap == mouse_mod.input and
+    elseif gui.m_cap == mouse_mod.input + (gfx.mouse_cap&mouse_mod.lmb) and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Add input FX to selected tracks " ..
                       "[" .. mouse_mod[mouse_mod.input]() .. " + " .. enter .. "]"
       return
-    elseif gui.m_cap == mouse_mod.input + mouse_mod.clear and
+    elseif gui.m_cap == mouse_mod.input + mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Clear input FX chain and add FX " .. "[" .. mouse_mod[mouse_mod.clear]() ..
                        " + " .. mouse_mod[mouse_mod.input]() .. " + " .. enter .. "]"
@@ -4023,15 +4111,22 @@ gui.hints.generate = function(id)
       gui.hints_txt = "Add FX to selected items' active takes " ..
                       "[" .. mouse_mod[mouse_mod.take]() .. " + " .. enter .. "]"
       return
-    elseif gui.m_cap == mouse_mod.take + mouse_mod.clear and
+    elseif gui.m_cap == mouse_mod.take + mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Clear take FX chain and add FX " .. "[" .. mouse_mod[mouse_mod.clear]() ..
                       " + " .. mouse_mod[mouse_mod.take]() .. " + " .. enter .. "]"                  
       return
-    elseif gui.m_cap == mouse_mod.clear and
+    elseif gui.m_cap == mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) and
            scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = (config.tt_apply_reverse and "Add" or "Apply") .. " track template " ..
                       "[" .. mouse_mod[mouse_mod.clear]() .. " + " .. enter .. "]"
+      return
+    elseif gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+      gui.hints_txt = "Add " .. (select(2, gui.parseResult(scr.results_list[gui.Results.sel])) == "TEMPLATE" and
+                      "template" or "FX") .. " to a new send track " ..
+                      "[" .. mouse_mod[mouse_mod.ctrl]() .. " + " ..
+                      mouse_mod[mouse_mod.shift]() .. " + " ..
+                      mouse_mod[mouse_mod.alt]() .. " + " .. enter .. "]"
       return
     end
   end
@@ -5257,7 +5352,7 @@ function prefsView()
   
   gui.wnd_h = gui.border * 2
  
-  gui.Prefs = gui:setChild{w = gui.wnd_w - gui.border * 2, h = gui.wnd_h}
+  gui.Prefs = gui:setChild{w = gui.wnd_w - gui.border * 2, h = gui.wnd_h, cursor = "arrow"}
   
   gui.Prefs.Nav = gui.Prefs:setChild({id = "nav", h = math.floor(gui.row_h * 0.5), bgr = true}, true)
   gui.Prefs.Nav:setStyle("prefs")
@@ -5302,26 +5397,36 @@ function prefsView()
 end
 
 function getMobj()
-  if gui.m_cap&mouse_mod.lmb == 1 and gui.m_cap ~= 25 and gui.m_cap ~= 29 and
+  local setCursor = function(num, name)
+    local cur = reaper.JS_Mouse_LoadCursor(num)
+    reaper.JS_Mouse_SetCursor(cur)
+    gui.m_cursor = "name"
+  end
+  
+  if gui.m_cap&mouse_mod.lmb == 1 and gui.m_cap ~= 25 and
      gui.active and gui.active.id:match("^result") and
      #scr.results_list > 0 and not scr.results_list[gui.Results.sel]:match("^ACTION") then
     if gui.m_x_click ~= gui.m_x or gui.m_y_click ~= gui.m_y then
       if reaper.JS_Mouse_LoadCursor then
         if m_obj then 
-          if gui.m_cursor ~= "dragdrop" then
-            local cur = reaper.JS_Mouse_LoadCursor(182)
+          if gui.m_cursor ~= "dragdrop" and
+             gui.m_cap ~= mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+             setCursor(182, "dragdrop")
+          elseif gui.m_cursor ~= "dragdropsend" and
+                 gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+            setCursor(1011, "dragdropsend")
+            local cur = reaper.JS_Mouse_LoadCursor(1011)
             reaper.JS_Mouse_SetCursor(cur)
-            gui.m_cursor = "dragdrop"
+            gui.m_cursor = "dragdropsend"  
           end
         else
           if gui.m_cursor ~= "cantdrop" then
-            local cur = reaper.JS_Mouse_LoadCursor(32648)
-            reaper.JS_Mouse_SetCursor(cur)
-            gui.m_cursor = "cantdrop"
+            setCursor(32648, "cantdrop")
           end
         end
       end
     end
+    
     local dest, segment
     if reaper.BR_GetMouseCursorContext then
       dest, segment = reaper.BR_GetMouseCursorContext()
@@ -5578,16 +5683,16 @@ function main()
   
   if not config.ext_check then kbActions() end
 
-  if not gui.search_suspend or gui.search_suspend and gui.str == ""then-- and gui.str:len() > 1 then
+  if not gui.search_suspend or gui.search_suspend and gui.str == "" then
     if gui.str ~= "" and (scr.re_search or
        scr.do_search and gui.str ~= gui.str_temp and not get_db) then -- generate matches
       gui.str_temp = gui.str
-      if (not gui.str:match(".+[%s/]$") and not gui.str:match(".+/%d+$")
-         or scr.re_search) and #scr.results_list > 0 then
+      --[[if (not gui.str:match(".+[%s/]$") and not gui.str:match(".+/%d+$")
+         or scr.re_search) and #scr.results_list > 0 then]]
         gui.Results = {sel = (gui.ch == ignore_ch.f7 or gui.ch == ignore_ch.f8) and
                        (gui.Results.sel <= config.results_max and gui.Results.sel or
                         config.results_max) or 1}
-      end
+      --end
       scr.re_search = nil
       parseQuery()
        
@@ -5616,10 +5721,12 @@ function main()
  
     if config.pin and (not config.fx_hide or gfx.getchar(65536)&2 ~= 2) and
        config.no_sel_tracks < 3 then
-      if not scr.result_is_action and gui.m_cap ~= mouse_mod.shift + mouse_mod.alt then
+      if not scr.result_is_action and gui.m_cap ~= mouse_mod.shift + mouse_mod.alt and
+         not scr.bypass_reopen then
         gui.reopen = true gui:init()
       else
         scr.result_is_action = nil
+        scr.bypass_reopen = nil
       end
     else
       reaper.atexit(exit_states)
