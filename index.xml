@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="57bbc6547ad2910288c8cd7e627c1bfbf5276639">
+<index version="1" name="Neutronic Scripts" commit="83f23999e54e18d93d78e20f3471badae932bc22">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -488,7 +488,7 @@ sends selected tracks (or track under mouse) to it
 # update mouse cursor when switching views with key commands
 # improve hints
 # update help file]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/57bbc6547ad2910288c8cd7e627c1bfbf5276639/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/83f23999e54e18d93d78e20f3471badae932bc22/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
