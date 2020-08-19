@@ -1064,8 +1064,9 @@ function createTrackSend(origin_tr, dest_tr)
     if origin_tr[i] == reaper.GetMasterTrack(0) then return end
     reaper.CreateTrackSend(origin_tr[i], dest_tr)
   end
+
   reaper.Main_OnCommand(40293, 0) -- Track: View routing and I/O for current/last touched track
-  if reaper.JS_Window_GetForeground then
+  if reaper.JS_Window_GetForeground and rpr.ver >= 6 then
     local wnd = reaper.JS_Window_GetForeground()
     reaper.JS_Window_SetZOrder(wnd, "TOPMOST")
     
@@ -1127,7 +1128,7 @@ function fxTrack(sel_tr_count, is_m_sel)
       local sel_tracks
       
       if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) and
-         type(m_obj) == "userdata" or cntSelTrs() > 0 then
+         type(m_obj) == "userdata" or not m_obj and cntSelTrs() > 0 then
         scr.show_routing = true
         if type(m_obj) == "userdata" and m_obj ~= reaper.GetMasterTrack(0) then
           sel_tracks = {m_obj}
