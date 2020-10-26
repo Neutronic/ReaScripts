@@ -1,14 +1,14 @@
 --[[
 Description: Show track or take envelope for last touched parameter
 About: Adds tracks or takes envelopes for the last touched FX parameter.
-Version: 1.01
+Version: 1.02
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
 Changelog:
-  # check the pointer when parameter modulation is enabled
+  # check if touched parameter exists
 --]]
 
 ---------- USER DEFINABLES ----------
@@ -53,33 +53,40 @@ function track_fx(track, paramnumber, fx_number)
   if fx_num_f ~= fx_number then return end
   local trf_is_open = reaper.TrackFX_GetOpen(track, fx_number)
   if not trf_is_open then return end
-  reaper.Undo_BeginBlock()
-    local retval, fx_name = reaper.TrackFX_GetFXName(track, fx_number, "")
-    if tracknumber > 0 then
-      reaper.SetMediaTrackInfo_Value(track, "B_SHOWINTCP", 1)
-    else
-      reaper.SetMasterTrackVisibility(1)
-      reaper.Main_OnCommand(reaper.NamedCommandLookup("_XENAKIOS_TVPAGEHOME"), 0)
+  
+  local retval, fx_name = reaper.TrackFX_GetFXName(track, fx_number, "")
+  local _, param_name = reaper.TrackFX_GetParamName(track, fx_number, paramnumber, "")
+  local env = reaper.GetFXEnvelope(track, fx_number, paramnumber, false)
+  if reaper.ValidatePtr2(0, env, "TrackEnvelope*") and toggle then
+    reaper.Undo_BeginBlock()
+    local _, env_chunk = reaper.GetEnvelopeStateChunk(env, "", false)
+    local vis = env_chunk:match("VIS (%d)")
+    if vis == "1" then -- if env is visible
+      reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%10"), false)
+    elseif vis == "0" then -- if env is not visible
+      reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%11"), false)
     end
-    local _, param_name = reaper.TrackFX_GetParamName(track, fx_number, paramnumber, "")
-    local env = reaper.GetFXEnvelope(track, fx_number, paramnumber, false)
-    if reaper.ValidatePtr2(0, env, "TrackEnvelope*") and toggle then
-      local _, env_chunk = reaper.GetEnvelopeStateChunk(env, "", false)
-      local vis = env_chunk:match("VIS (%d)")
-      if vis == "1" then -- if env is visible
-        reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%10"), false)
-      elseif vis == "0" then -- if env is not visible
-        reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%11"), false)
-      end
-    else 
+  else 
+    env = reaper.GetFXEnvelope(track, fx_number, paramnumber, true)
+    if tracknumber > 0 and env and ai_insert then -- if not master and ai_insert is on
+      reaper.Undo_BeginBlock()
       reaper.Main_OnCommand(41163, 0) -- unarm all envelopes
-      env = reaper.GetFXEnvelope(track, fx_number, paramnumber, true)
-      if tracknumber > 0 and ai_insert then -- if not master and ai_insert is on
-        create_ai(track, env)
-      end
+      create_ai(track, env)
+    else
+      return
     end
-    reaper.TrackList_AdjustWindows(false)
-    reaper.UpdateArrange()
+  end
+  
+  if tracknumber > 0 then
+    reaper.SetMediaTrackInfo_Value(track, "B_SHOWINTCP", 1)
+  else
+    reaper.SetMasterTrackVisibility(1)
+    reaper.Main_OnCommand(reaper.NamedCommandLookup("_XENAKIOS_TVPAGEHOME"), 0)
+  end
+  
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+
   undo_close(param_name, fx_name)
 end
 
