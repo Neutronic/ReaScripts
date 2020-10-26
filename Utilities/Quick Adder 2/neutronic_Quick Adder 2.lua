@@ -18,11 +18,6 @@ Changelog:
 local rpr = {}
 local scr = {}
 
-scr.more_wnd = reaper.LocalizeString("+", "common")
-scr.param_wnd = reaper.LocalizeString("Param", "common")
-scr.add_wnd = reaper.LocalizeString("Add", "common")
-scr.remove_wnd = reaper.LocalizeString("Remove", "common")
-
 rpr.x64 = reaper.GetAppVersion():match(".-/%D-(64)") and true or nil
 
 local cur_os = reaper.GetOS()
