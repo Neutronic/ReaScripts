@@ -190,7 +190,7 @@ local mouse_mod = {ctrl = 4,
             [4] = function()return os_is.mac and (literal and "Command" or utf8.char(8984)) or "Ctrl" end,
             [8] = function()return os_is.mac and not literal and utf8.char(8679) or "Shift" end,
             [16] = function()return os_is.mac and (literal and "Option" or utf8.char(8997)) or "Alt" end,
-            [32] = function()return os_is.mac and (literal and "Control" or utf8.char(8997)) or "Win" end,
+            [32] = function()return os_is.mac and (literal and "Control" or "^") or "Win" end,
             [64] = "MMB",
             [0] = "No Mod"
             }
@@ -4156,6 +4156,12 @@ gui.hints.generate = function(id)
       gui.hints_txt = "Add " .. (select(2, gui.parseResult(scr.results_list[gui.Results.sel])) == "TEMPLATE" and
                       "template" or "FX") .. " to a new send track " ..
                       "[" .. mouse_mod[mouse_mod.ctrl]() .. " + " ..
+                      mouse_mod[mouse_mod.shift]() .. " + " ..
+                      mouse_mod[mouse_mod.alt]() .. " + " .. enter .. "]"
+      return
+    elseif gui.m_cap == mouse_mod.win + mouse_mod.shift + (gfx.mouse_cap&mouse_mod.lmb) then
+      gui.hints_txt = "Add FX track above selected tracks " ..
+                      "[" .. mouse_mod[mouse_mod.win]() .. " + " ..
                       mouse_mod[mouse_mod.shift]() .. " + " ..
                       mouse_mod[mouse_mod.alt]() .. " + " .. enter .. "]"
       return
