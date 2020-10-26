@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + Win + Shift + Enter: insert FX on a new track above the first selected track
+  + LeftWin + Alt + Enter: insert FX on a new track above the first selected track
     or the track under mouse cursor (Ctrl + Shift + Enter on macOS)
   # ignore "Auto-float newly created FX windows" in REAPER preferences
 --]]
@@ -1035,21 +1035,19 @@ function doAdd()
     end
   else
     if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
-       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) then
+       gui.m_cap == mouse_mod.alt + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) then
       scr.create_send = true
     end
     local m_obj_is_tr = reaper.ValidatePtr2(0, m_obj, "MediaTrack*")
     local m_obj_is_tk = reaper.ValidatePtr2(0, m_obj, "MediaItem_Take*")
     if gui.m_cap&mouse_mod.take == 0 and not m_obj and gui.m_cap&mouse_mod.win == 0 or
        gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
-       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.alt + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) or
        m_obj_is_tr or type(m_obj) == "string" then
       reaper.PreventUIRefresh(1)
         fxTrack()
       reaper.PreventUIRefresh(-1)
-    elseif gui.m_cap&mouse_mod.take == mouse_mod.take and 
-           gui.m_cap&mouse_mod.win == 0 and gui.m_cap&mouse_mod.shift == 0 or
-           m_obj_is_tk then
+    elseif gui.m_cap&mouse_mod.take == mouse_mod.take or m_obj_is_tk then
       reaper.PreventUIRefresh(1)
         fxItem()
       reaper.PreventUIRefresh(-1)  
@@ -1144,7 +1142,7 @@ function fxTrack(sel_tr_count, is_m_sel)
 
     if m_obj or config.no_sel_tracks == 2 or (cntSelTrs() > 0 and
       (gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or 
-       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb))) then
+       gui.m_cap == mouse_mod.alt + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb))) then
       if scr.create_send then scr.create_send = nil end
       
       local sel_tracks
@@ -1980,7 +1978,7 @@ This is achieved through utilizing contextual key commands, which perform as fol
   enter .. [[: inserts FX or template on a new track and sends selected tracks (or track under mouse) to it;
   ]]..
   
-  mouse_mod[mouse_mod.win]() .. " + " .. mouse_mod[mouse_mod.shift]() .. " + "  ..
+  mouse_mod[mouse_mod.win]() .. " + " .. mouse_mod[mouse_mod.alt]() .. " + "  ..
   enter .. [[: inserts FX on a new track above the first selected track or the track under mouse cursor.
   
 Quick Adder 2 also introduces an in-script favorites system.
@@ -4160,10 +4158,9 @@ gui.hints.generate = function(id)
                       mouse_mod[mouse_mod.shift]() .. " + " ..
                       mouse_mod[mouse_mod.alt]() .. " + " .. enter .. "]"
       return
-    elseif gui.m_cap == mouse_mod.win + mouse_mod.shift + (gfx.mouse_cap&mouse_mod.lmb) then
+    elseif gui.m_cap == mouse_mod.win + mouse_mod.alt + (gfx.mouse_cap&mouse_mod.lmb) then
       gui.hints_txt = "Add FX track above selected tracks " ..
                       "[" .. mouse_mod[mouse_mod.win]() .. " + " ..
-                      mouse_mod[mouse_mod.shift]() .. " + " ..
                       mouse_mod[mouse_mod.alt]() .. " + " .. enter .. "]"
       return
     end
