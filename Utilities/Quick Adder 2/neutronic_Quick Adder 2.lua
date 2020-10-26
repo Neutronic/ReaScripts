@@ -997,8 +997,9 @@ function getSelectedTracks()
 end
 
 function doAdd()
+  local auto_float
   if reaper.SNM_GetIntConfigVar then
-    local auto_float = reaper.SNM_GetIntConfigVar("fxfloat_focus", 0)
+    auto_float = reaper.SNM_GetIntConfigVar("fxfloat_focus", 0)
     if auto_float&4 > 0 then
       reaper.SNM_SetIntConfigVar("fxfloat_focus", auto_float~4)
     end
