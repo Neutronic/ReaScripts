@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.33
+Version: 2.34
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,16 +10,19 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + Ctrl(Cmd) + Shift + Alt + Enter: inserts FX or template on new track and
-  sends selected tracks (or track under mouse) to it
-  # streamline targeting logic
-  # update mouse cursor when switching views with key commands
-  # improve hints
-  # update help file
+  + Win + Shift + Enter: insert FX on a new track above the first selected track
+    ot the track under mouse cursor (Ctrl + Shift + Enter on macOS)
+  # ignore "Auto-float newly created FX windows" in REAPER preferences
 --]]
 
 local rpr = {}
 local scr = {}
+
+scr.more_wnd = reaper.LocalizeString("+", "common")
+scr.param_wnd = reaper.LocalizeString("Param", "common")
+scr.add_wnd = reaper.LocalizeString("Add", "common")
+scr.remove_wnd = reaper.LocalizeString("Remove", "common")
+
 rpr.x64 = reaper.GetAppVersion():match(".-/%D-(64)") and true or nil
 
 local cur_os = reaper.GetOS()
@@ -179,6 +182,7 @@ local mouse_mod = {ctrl = 4,
             alt = 16,
             lmb = 1,
             rmb = 2,
+            win = 32,
             mmb = 64,
             no_mod = 0,
             [1] = "LMB",
@@ -186,6 +190,7 @@ local mouse_mod = {ctrl = 4,
             [4] = function()return os_is.mac and (literal and "Command" or utf8.char(8984)) or "Ctrl" end,
             [8] = function()return os_is.mac and not literal and utf8.char(8679) or "Shift" end,
             [16] = function()return os_is.mac and (literal and "Option" or utf8.char(8997)) or "Alt" end,
+            [32] = function()return os_is.mac and (literal and "Control" or utf8.char(8997)) or "Win" end,
             [64] = "MMB",
             [0] = "No Mod"
             }
@@ -992,6 +997,13 @@ function getSelectedTracks()
 end
 
 function doAdd()
+  if reaper.SNM_GetIntConfigVar then
+    local auto_float = reaper.SNM_GetIntConfigVar("fxfloat_focus", 0)
+    if auto_float&4 > 0 then
+      reaper.SNM_SetIntConfigVar("fxfloat_focus", auto_float~4)
+    end
+  end
+  
   if scr.results_list[gui.Results.sel]:match("^(%w+).+") == "ACTION" and
      (gui.m_cap == 0 or gui.m_cap == mouse_mod.lmb) then
     local section = select(3, gui.parseResult(scr.results_list[gui.Results.sel])):
@@ -1021,23 +1033,32 @@ function doAdd()
       ttAdd(scr.results_list[gui.Results.sel])
     end
   else
-    if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+    if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) then
       scr.create_send = true
     end
     local m_obj_is_tr = reaper.ValidatePtr2(0, m_obj, "MediaTrack*")
     local m_obj_is_tk = reaper.ValidatePtr2(0, m_obj, "MediaItem_Take*")
-    if gui.m_cap&mouse_mod.take == 0 and not m_obj or
+    if gui.m_cap&mouse_mod.take == 0 and not m_obj and gui.m_cap&mouse_mod.win == 0 or
        gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or
+       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb) or
        m_obj_is_tr or type(m_obj) == "string" then
       reaper.PreventUIRefresh(1)
         fxTrack()
       reaper.PreventUIRefresh(-1)
-    elseif gui.m_cap&mouse_mod.take == mouse_mod.take or m_obj_is_tk then
+    elseif gui.m_cap&mouse_mod.take == mouse_mod.take and 
+           gui.m_cap&mouse_mod.win == 0 and gui.m_cap&mouse_mod.shift == 0 or
+           m_obj_is_tk then
       reaper.PreventUIRefresh(1)
         fxItem()
       reaper.PreventUIRefresh(-1)  
     end
   end
+  
+  if auto_float and auto_float&4 > 0 then
+    reaper.SNM_SetIntConfigVar("fxfloat_focus", auto_float)
+  end
+  
   gui.selected = nil
   gui.click_ignore = nil
   gui.loop_start = nil
@@ -1064,7 +1085,6 @@ function createTrackSend(origin_tr, dest_tr)
     if origin_tr[i] == reaper.GetMasterTrack(0) then return end
     reaper.CreateTrackSend(origin_tr[i], dest_tr)
   end
-
   reaper.Main_OnCommand(40293, 0) -- Track: View routing and I/O for current/last touched track
   if reaper.JS_Window_GetForeground and rpr.ver >= 6 then
     local wnd = reaper.JS_Window_GetForeground()
@@ -1120,9 +1140,10 @@ function fxTrack(sel_tr_count, is_m_sel)
       waitResult()
   else
     wait_result = scr.results_list[gui.Results.sel]
-    
+
     if m_obj or config.no_sel_tracks == 2 or (cntSelTrs() > 0 and
-       gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb)) then
+      (gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) or 
+       gui.m_cap == mouse_mod.shift + mouse_mod.win + (gfx.mouse_cap&mouse_mod.lmb))) then
       if scr.create_send then scr.create_send = nil end
       
       local sel_tracks
@@ -1162,8 +1183,8 @@ function fxTrack(sel_tr_count, is_m_sel)
  
       local no_fx = fxTrack(cntSelTrs(), false)
       
-      if scr.show_routing then
-        createTrackSend(sel_tracks, tr)
+      if scr.show_routing then 
+        if gui.m_cap&mouse_mod.win == 0 then createTrackSend(sel_tracks, tr) end
         scr.show_routing = nil
         scr.m_obj = nil
       end
@@ -1217,6 +1238,8 @@ function fxFlush(object, kind)
 end
 
 function isInput()
+  if gui.m_cap&mouse_mod.win > 0 then return false end
+  
   if gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
     return false
   elseif gui.m_cap&mouse_mod.input == mouse_mod.input then
@@ -1297,6 +1320,7 @@ function fxFloat(obj, name)
     reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 3)  
   elseif name:match("%.RfxChain$") then -- if chain
     reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 1)
+    --reaper.TrackFX_SetOpen(obj, fx_idx, false)
   else
     if isInput() and (not is_fxc_vis or is_fxc_vis == 0) or is_fxc_vis == -1 then -- if FX chain is hidden
       reaper[obj_type .. "FX_Show"](obj, fx_idx, config.fx_hide and 2 or 3)
@@ -1952,7 +1976,11 @@ This is achieved through utilizing contextual key commands, which perform as fol
   mouse_mod[mouse_mod.clear]() .. " + " .. mouse_mod[mouse_mod.take]() .. " + " .. enter .. [[: clears take FX chains before adding FX;
   ]]..
   mouse_mod[mouse_mod.ctrl]() .. " + " .. mouse_mod[mouse_mod.shift]() .. " + " .. mouse_mod[mouse_mod.alt]() .. " + " ..
-  enter .. [[: inserts FX or template on a new track and sends selected tracks (or track under mouse) to it.
+  enter .. [[: inserts FX or template on a new track and sends selected tracks (or track under mouse) to it;
+  ]]..
+  
+  mouse_mod[mouse_mod.win]() .. " + " .. mouse_mod[mouse_mod.shift]() .. " + "  ..
+  enter .. [[: inserts FX on a new track above the first selected track or the track under mouse cursor.
   
 Quick Adder 2 also introduces an in-script favorites system.
 It will help you promote any search result to the top of the list.
@@ -2566,7 +2594,6 @@ function gui:setCursor()
 end
 
 function gui:hover(special)
-  if pu_wnd then return self end
   if self.hover_special and not special then return end
   if self:isOver() then
     gui.over = self.id
@@ -2574,6 +2601,9 @@ function gui:hover(special)
     if gui.focus == 2 then
       self:onSelect()
       self:onClick()
+    elseif gui.m_cap&1 == 0 and gui.selected then
+      gui.selected = nil
+      gui.loop_start = nil
     end
   end
   return self
@@ -2604,7 +2634,7 @@ function gui:onClick()
     return
   end
   
-  if (gui.m_cap&1 == 1) then
+  if gui.m_cap&1 == 1 then
     if not gui.loop_start then
       gui.loop_start = self.id
     elseif gui.loop_start and gui.loop_start == self.id and not gui.active then
@@ -2671,7 +2701,7 @@ end
 
 function gui:onSelect()
   if gui.m_cap == 25 then return end -- if Alt + Shift
-  if (gui.m_cap&1 == 1) and not gui.active and not gui.click_ignore and
+  if gui.m_cap&1 == 1 and not gui.active and not gui.click_ignore and
       self.on_select and not gui.selected and self.id then
     if gui.important and (gui.important:isOver() and gui.important.id ~= self.id or
        not gui.important:isOver() and gui.important.parent_id and gui.important.parent_id ~= self.id or
@@ -4734,7 +4764,7 @@ function kbActions()
     _timers.arrow_key = nil
   end
   ----
-
+  
   if gui.m_cap == mouse_mod.ctrl and gui.ch == 1 and gui.str ~= "" then -- CTRL+A
     gui.b_count = 0
     gui.str_hl_start = 1
@@ -5434,7 +5464,41 @@ function getMobj()
     end
     if segment == "empty" then m_obj = "new_track" goto SKIP end
     local x, y = reaper.GetMousePosition()
-    local tk = select(2, reaper.GetItemFromPoint(x, y, true))
+    local tk, fx_wnd = select(2, reaper.GetItemFromPoint(x, y, true))
+    
+    --[[if not tk then
+      local checkParent = function(parent)
+        if reaper.GetMainHwnd() == reaper.JS_Window_GetRelated(parent, "OWNER") and
+           ((reaper.JS_Window_FindChild(parent, scr.more_wnd, true) and
+           reaper.JS_Window_FindChild(parent, scr.param_wnd, true)) or
+           reaper.JS_Window_FindChild(parent, scr.add_wnd, true) and
+           reaper.JS_Window_FindChild(parent, scr.remove_wnd, true) and
+           reaper.JS_Window_FindChild(parent, "List1", true)) then
+          fx_wnd = parent
+          return true
+        else
+          return false
+        end
+      end
+      
+      local wnd = reaper.JS_Window_FromPoint(reaper.GetMousePosition())
+      local wnd_parent1 = reaper.JS_Window_GetParent(wnd)
+      local wnd_parent2 = reaper.JS_Window_GetParent(wnd_parent1)
+      if checkParent(wnd) or
+         checkParent(wnd_parent1) or
+         checkParent(wnd_parent2) then
+        reaper.JS_Window_SetFocus(fx_wnd)
+        local obj_type, tr_num, it_num, fx_num = reaper.GetFocusedFX()
+        if obj_type > 0 then
+          local tr = reaper.GetTrack(0, tr_num - 1)
+          local item = reaper.GetTrackMediaItem(tr, it_num)
+          if item then
+            tk = reaper.GetTake(item, fx_num>>16)
+          end
+        end
+      end
+    end]]
+    
     if tk then
       m_obj = tk
     else
