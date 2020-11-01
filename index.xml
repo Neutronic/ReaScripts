@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="bf99d0aee4a89d35ff3140cb468d2b0ee110e47f">
+<index version="1" name="Neutronic Scripts" commit="7218325dd06970d9e7b51ba9fa0864e050c3c070">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -496,9 +496,9 @@ sends selected tracks (or track under mouse) to it
       </version>
       <version name="2.34" author="Neutronic" time="2020-10-26T12:19:57Z">
         <changelog><![CDATA[+ LeftWin + Alt + Enter: insert FX on a new track above the first selected track
-  or the track under mouse cursor (Ctrl + Shift + Enter on macOS)
+  or the track under mouse cursor (Ctrl + Option + Return on macOS)
 # ignore "Auto-float newly created FX windows" in REAPER preferences]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/bf99d0aee4a89d35ff3140cb468d2b0ee110e47f/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/7218325dd06970d9e7b51ba9fa0864e050c3c070/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
