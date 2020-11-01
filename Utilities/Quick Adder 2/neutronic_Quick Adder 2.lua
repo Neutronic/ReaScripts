@@ -11,7 +11,7 @@ Links:
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
   + LeftWin + Alt + Enter: insert FX on a new track above the first selected track
-    or the track under mouse cursor (Ctrl + Shift + Enter on macOS)
+    or the track under mouse cursor (Ctrl + Option + Return on macOS)
   # ignore "Auto-float newly created FX windows" in REAPER preferences
 --]]
 
