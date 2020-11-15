@@ -1,7 +1,7 @@
 [CHANGELOG]
 
 v2.34 - October 26 2020 [post](https://forum.cockos.com/showthread.php?p=2357320#post2357320)
-+ LeftWin + Alt + Enter: insert FX on a new track above the first selected track
+<span style="color:blue">+</span> LeftWin + Alt + Enter: insert FX on a new track above the first selected track
 or the track under mouse cursor (Ctrl + Option + Return on macOS)
 &#35; ignore "Auto-float newly created FX windows" in REAPER preferences
 
