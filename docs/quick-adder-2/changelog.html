@@ -14,15 +14,15 @@
 				text-decoration:none;
 				}
 			
-			a:hover {
+			a:hover, a:active {
 				color:white;
 				}
-			
+						
 			body {
 				font-family:"Arial";
 				font-size:16px;
 				line-height:170%;
-				background-color:#464646;
+				background-color:#262626;
 				color:white;
 				width: 75vw;
 				margin: auto;
@@ -63,9 +63,11 @@
 						
 			mark {
 				border-radius: 2px;
-				background-color:#464646;
+				background-color:#404040;
+				font-style: italic;
 				color:white;
-				padding: 3px 5px 3px 5px;
+				padding: 3px 6px 3px 6px;
+				font-size:17px;
 				}
 			
 			h1 {
@@ -74,16 +76,37 @@
 			
 			.release {
 				border-color:#606060;
-				background-color:#505050;
+				background-color:#404040;
 				border-radius: 5px;
 				border-style: none none none none;
 				padding: 0.4em 1.3em 0.4em 1.3em;
 				margin-bottom: 1.3em;
 				}
+			#topBttn {
+				display: none;
+				position: fixed;
+				bottom: 20px;
+				right: 30px;
+				z-index: 99;
+				font-size: 30px;
+				border: solid;
+				border-width: 1px;
+				border-color: #262626;
+				outline: none;
+				background-color: #404040;
+				color: white;
+				cursor: pointer;
+				padding: 10px 15px 15px 15px;
+				border-radius: 4px;
+				}
+
+			#topBttn:hover {
+				background-color: #606060;
+				}				
 		</style>
 	</head>
 	
-	<body>
+	<body>	
 		<h1>Quick Adder 2 <sup>[changelog]</sup></h1>
 		
 		<div class="release">
@@ -305,5 +328,26 @@
 				</ul>
 			</p>
 		</div>
+		
+		<button onclick="topFunction()" id="topBttn" title="Go to top">&uarr;</button>
+		
+		<script>
+			var topButton = document.getElementById("topBttn");
+
+			window.onscroll = function() {scrollFunction()};
+
+			function scrollFunction() {
+			  if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
+				topButton.style.display = "block";
+			  } else {
+				topButton.style.display = "none";
+			  }
+			}
+
+			function topFunction() {
+			  document.body.scrollTop = 0;
+			  document.documentElement.scrollTop = 0;
+			}
+		</script>
 	</body>
 </html>
