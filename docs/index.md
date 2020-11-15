@@ -1,1 +1,0 @@
-# [ReaScripts](https://www.reaper.fm/sdk/reascript/reascript.php) by Neutronic
