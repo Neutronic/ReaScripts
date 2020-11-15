@@ -1,141 +1,224 @@
-[CHANGELOG]
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Quick Adder 2 Changelog</title>
+		<style type="text/css">
+			a:link {
+				color:#0066CC;
+				text-decoration: none;
+					}
+			a:visited {
+				color:#00FFFF;
+				text-decoration:none;
+				}
+			a:hover {
+				text-decoration:underline; 
+				}				
+			body {
+				font-family:"Arial";
+				font-size:13px;
+				line-height:170%;
+				background-color:#464646;
+				color:white;
+				}
+			.release {
+				padding-left:10px;
+				}
+			.add {
+				color:#00FF00;
+				font-weight:normal;
+				margin-left:10px;
+				}
+			.amend {
+				color:#FFCC00;
+				font-weight:normal;
+				margin-left:10px;
+				}
+			sup {
+				font-size:12px;
+				font-weight:normal;
+				}
+		</style>
+	</head>
+	
+	<body>
+		<h1>Quick Adder 2 <sup>changelog</sup></h1>
 
-v2.34 - October 26 2020 [post](https://forum.cockos.com/showthread.php?p=2357320#post2357320)
-<span style="color=blue"+</span> LeftWin + Alt + Enter: insert FX on a new track above the first selected track
-or the track under mouse cursor (Ctrl + Option + Return on macOS)
-&#35; ignore "Auto-float newly created FX windows" in REAPER preferences
+		<p class="release">
+			v2.34 - October 26 2020 (<a href=https://forum.cockos.com/showthread.php?p=2357320#post2357320>post</a>)<br />
+			<span class="add">●</span> LeftWin + Alt + Enter: insert FX on a new track above the first selected track or the track under mouse cursor (Ctrl + Option + Return on macOS)<br />
+			<span class="amend">●</span> ignore "Auto-float newly created FX windows" in REAPER preferences
+		</p>
 
-v2.33 – August 09 2020 (post)
-+ Ctrl(Cmd) + Shift + Alt + Enter: inserts FX or template on new track and sends selected tracks (or track under mouse) to it
-# streamline targeting logic
-# update mouse cursor when switching views with key commands
-# improve hints
-# update help file
+		<p class="release">
+			v2.33 – August 09 2020 (post)<br />
+			<span class="add">●</span> Ctrl(Cmd) + Shift + Alt + Enter: inserts FX or template on new track and sends selected tracks (or track under mouse) to it<br />
+			<span class="amend">●</span> streamline targeting logic<br />
+			<span class="amend">●</span> update mouse cursor when switching views with key commands<br />
+			<span class="amend">●</span> improve hints<br />
+			<span class="amend">●</span> update help file<br />
+		</p>
 
-v2.32 – July 17 2020
-# improve handling of filter strings with OR logical operator
+		<p class="release">
+			v2.32 – July 17 2020<br />
+			<span class="amend">●</span> improve handling of filter strings with OR logical operator
+		</p>
 
-v2.31 – July 15 2020
-# better handling of empty strings in getFXfolder() and fxExclCheck()
+		<p class="release">
+			v2.31 – July 15 2020<br />
+			<span class="amend">●</span> better handling of empty strings in getFXfolder() and fxExclCheck()
+		</p>
 
-v2.30 – July 07 2020
-# fix script crash if reaper-fxfolders.ini does not exist
+		<p class="release">
+			v2.30 – July 07 2020<br />
+			<span class="amend">●</span> fix script crash if reaper-fxfolders.ini does not exist
+		</p>
 
-v2.29 – June 28 2020
-+ Shift+Enter inserts templates above first selected track
-# more improvements to reaper-fxfolders.ini parsing
-# check VST names for illegal characters
-# improve overall character sanitizing logic
-# fix script crash if AU match doesn't have a space between
-developer and plugin names
-# improve INS/FOL filters logic
+		<p class="release">
+			v2.29 – June 28 2020<br />
+			<span class="add">●</span> Shift+Enter inserts templates above first selected track<br />
+			<span class="amend">●</span> more improvements to reaper-fxfolders.ini parsing<br />
+			<span class="amend">●</span> check VST names for illegal characters<br />
+			<span class="amend">●</span> improve overall character sanitizing logic<br />
+			<span class="amend">●</span> fix script crash if AU match doesn't have a space between developer and plugin names<br />
+			<span class="amend">●</span> improve INS/FOL filters logic
+		</p>
 
-v2.27 – June 24 2020
-# fix recalling favorites containing FX folder data
-# improve matching queries with numbers
+		<p class="release">
+			v2.27 – June 24 2020<br />
+			<span class="amend">●</span> fix recalling favorites containing FX folder data<br />
+			<span class="amend">●</span> improve matching queries with numbers
+		</p>
 
-v2.26 – June 21 2020
-# fix script crash when parsing fxfolders.ini
+		<p class="release">
+			v2.26 – June 21 2020<br />
+			<span class="amend">●</span> fix script crash when parsing fxfolders.ini
+		</p>
 
-v2.25 – June 19 2020 (post)
-+ search FX browser folders
-+ new FOL search filter for FX browser folders
-+ option to disable FX folders searching (PREFS --> Search and ...)
-+ new INS search filter for virtual instruments
-+ FX search filter now gets effects only
-+ configure Filter Tray items (right-click the tray button)
-+ configure FX show options (right-click the Show FX button)
-# move "Show FX at mouse cursor" to FX show options
-# improve illegal characters sanitizing
-# internal optimizations
+		<p class="release">
+			v2.25 – June 19 2020 (post)<br />
+			<span class="add">●</span> search FX browser folders<br />
+			<span class="add">●</span> new FOL search filter for FX browser folders<br />
+			<span class="add">●</span> option to disable FX folders searching (PREFS --> Search and ...)<br />
+			<span class="add">●</span> new INS search filter for virtual instruments<br />
+			<span class="add">●</span> FX search filter now gets effects only<br />
+			<span class="add">●</span> configure Filter Tray items (right-click the tray button)<br />
+			<span class="add">●</span> configure FX show options (right-click the Show FX button)<br />
+			<span class="amend">●</span> move "Show FX at mouse cursor" to FX show options<br />
+			<span class="amend">●</span> improve illegal characters sanitizing<br />
+			<span class="amend">●</span> internal optimizations<br />
+		</p>
 
-v2.23 – June 03 2020
-# escape backslashes in JS descriptions
+		<p class="release">
+			v2.23 – June 03 2020<br />
+			<span class="amend">●</span> escape backslashes in JS descriptions
+		</p>
 
-v2.22 – June 02 2020
-# fixed Default Filter setting
+		<p class="release">
+			v2.22 – June 02 2020<br />
+			<span class="amend">●</span> fixed Default Filter setting
+		</p>
 
-v2.21 – May 28 2020
-# recall docked state on QA2 reopening
+		<p class="release">
+			v2.21 – May 28 2020<br />
+			<span class="amend">●</span> recall docked state on QA2 reopening
+		</p>
 
-v2.20 – May 26 2020 (post)
-Text selection for editing:
-+ marquee select search box text
-+ "Ctrl(Cmd) + A" or double-click a search query to select all text
-+ "Ctrl(Cmd) + Left/Right" to move one word at a time
-+ "Shift + Left/Right" to select one letter at a time
-+ "Ctrl(Cmd) + Shift + Left/Right" to select one word at a time
-+ "Home" to go to start of the search query
-+ "End" to go to the end of search query
+		<p class="release">
+			v2.20 – May 26 2020 (post)<br />
+			&nbsp;&nbsp;&nbsp;Text selection for editing:<br />
+			<span class="add">●</span> marquee select search box text<br />
+			<span class="add">●</span> "Ctrl(Cmd) + A" or double-click a search query to select all text<br />
+			<span class="add">●</span> "Ctrl(Cmd) + Left/Right" to move one word at a time<br />
+			<span class="add">●</span> "Shift + Left/Right" to select one letter at a time<br />
+			<span class="add">●</span> "Ctrl(Cmd) + Shift + Left/Right" to select one word at a time<br />
+			<span class="add">●</span> "Home" to go to start of the search query<br />
+			<span class="add">●</span> "End" to go to the end of search query<br /><br />
+			&nbsp;&nbsp;&nbsp;The docked mode:<br />
+			<span class="add">●</span> right-click the hints bar to dock/undock the script's GUI<br />
+			<span class="add">●</span> automatically set result rows number when docked<br />
+			<span class="add">●</span> option to show result placeholders when docked<br />
+			<span class="add">●</span> highlight the GUI when docked and the script is focused<br />
+			<span class="add">●</span> temporarily undock the script when user opens QA2 Preferences<br />
+			<span class="add">●</span> adjust results text size for the docked mode<br />
+			<span class="add">●</span> open the filter tray vertically when docked and GUI width is less than the tray width<br /><br />
+			&nbsp;&nbsp;&nbsp;Various:<br />
+			<span class="add">●</span> option to float FX at mouse cursor<br />
+			<span class="add">●</span> maximum number of result rows increased to 99 for the undocked mode<br />
+			<span class="add">●</span> unlock minimum horizontal GUI size<br />
+			<span class="add">●</span> HiDPI/Retina displays support<br />
+			<span class="amend">●</span> make sure ALT + Key shortcuts do not collide with SHIFT + ALT + Key<br />
+			<span class="amend">●</span> fixed the "FX" filter sorting<br />
+			<span class="amend">●</span> fixed search box memory clearing when backspasing a whole query<br />
+			<span class="amend">●</span> insert correct result when no tracks selected and "Clear search box after insertion" is on<br />
+			<span class="amend">●</span> don't reset QA2 result selection after insertion if search box is empty<br />
+			<span class="amend">●</span> bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking
+		</p>
 
-The docked mode:
-+ right-click the hints bar to dock/undock the script's GUI
-+ automatically set result rows number when docked
-+ option to show result placeholders when docked
-+ highlight the GUI when docked and the script is focused
-+ temporarily undock the script when user opens QA2 Preferences
-+ adjust results text size for the docked mode
-+ open the filter tray vertically when docked and GUI width is
-less than the tray width
+		<p class="release">
+			v2.16 – April 29 2020<br />
+			<span class="add">●</span> support script docking with the title bar menu option (Windows only)<br />
+			<span class="amend">●</span> check JS names for double quotes
+		</p>
 
-Various:
-+ option to float FX at mouse cursor
-+ maximum number of result rows increased to 99 for the undocked mode
-+ unlock minimum horizontal GUI size
-+ HiDPI/Retina displays support
-# make sure ALT + Key shortcuts do not collide with SHIFT + ALT + Key
-# fixed the "FX" filter sorting
-# fixed search box memory clearing when backspasing a whole query
-# insert correct result when no tracks selected and "Clear search
-box after insertion" is on
-# don't reset QA2 result selection after insertion if search box is empty
-# bypass gfx.mouse_cap hang on macOS when inserting FX through double-clicking
+		<p class="release">
+			v2.15 – April 28 2020 (post)<br />
+			<span class="add">●</span> search and run actions<br />
+			<span class="add">●</span> add actions to favorites<br />
+			<span class="add">●</span> new filter to search actions only<br />
+			<span class="add">●</span> define position of actions in the global search order<br />
+			<span class="add">●</span> display actions toggle state in real time<br />
+			<span class="add">●</span> option to toggle the actions functionality on/off<br />
+			<span class="add">●</span> ability to resize the search view horizontally<br />
+			<span class="add">●</span> notify user if there is no SWS and/or JS API installed<br />
+			<span class="amend">●</span> enhanced exact matching logic<br />
+			<span class="amend">●</span> enhanced FX filter string parsing
+		</p>
 
-v2.16 – April 29 2020
-+ support script docking with the title bar menu option (Windows only)
-# check JS names for double quotes
+		<p class="release">
+			v2.10 - April 06 2020 (post)<br />
+			<span class="add">●</span> drag and drop support<br />
+			<span class="add">●</span> dropping an effect on empty TCP/MCP automatically creates a named track with the effect on it<br />
+			<span class="add">●</span> options for "no track selected" scenario<br />
+			<span class="add">●</span> ability to pin Quick Adder<br />
+			<span class="add">●</span> place text box carriage with mouse cursor<br />
+		</p>
 
-v2.15 – April 28 2020 (post)
-+ search and run actions
-+ add actions to favorites
-+ new filter to search actions only
-+ define position of actions in the global search order
-+ display actions toggle state in real time
-+ option to toggle the actions functionality on/off
-+ ability to resize the search view horizontally
-+ notify user if there is no SWS and/or JS API installed
-# enhanced exact matching logic
-# enhanced FX filter string parsing
+		<p class="release">
+			v2.08 – March 31 2020 (post)<br />
+			<span class="add">●</span> option to clear the search box after FX/template insertion<br />
+			<span class="add">●</span> put VSTi/AUi on a new named/armed/monitored track when no tracks are selected<br />
+			<span class="add">●</span> respect FX filter string rules in REAPER Preferences --> Plug-ins (video)<br />
+			<span class="add">●</span> ESC closes Quick Adder when the search box is empty<br />
+			<span class="amend">●</span> constrain favorites reordering to Alt + Shift + Up/Down only<br />
+			<span class="amend">●</span> improved "FX not found" warning<br />
+			<span class="amend">●</span> updated help file
+		</p>
 
-v2.10 - April 06 2020 (post)
-+ drag and drop support
-+ dropping an effect on empty TCP/MCP automatically
-creates a named track with the effect on it
-+ options for "no track selected" scenario
-+ ability to pin Quick Adder
-+ place text box carriage with mouse cursor
+		<p class="release">
+			v2.07 – March 26 2020 (post)<br />
+			<span class="add">●</span> option to show favorites when the search box is empty<br />
+			<span class="add">●</span> ability to reorder favorites with Alt + Shift + Up/Down<br />
+		</p>
 
-v2.08 – March 31 2020 (post)
-+ option to clear the search box after FX/template insertion
-+ put VSTi/AUi on a new named/armed/monitored track when no
-tracks are selected
-+ respect FX filter string rules in REAPER Preferences --> Plug-ins (video)
-+ ESC closes Quick Adder when the search box is empty
-# constrain favorites reordering to Alt + Shift + Up/Down only
-# improved "FX not found" warning
-# updated help file
+		<p class="release">
+			v2.05 – March 22 2020 (post)<br />
+			<span class="add">●</span> option to toggle FX/track template GUI floating after insertion<br />
+			<span class="add">●</span> prompt to insert tracks to put FX on, when there are no tracks in project and master track is unselected<br />
+			<span class="add">●</span> pass Ctrl(Cmd)+Z and Ctrl(Cmd)+Shift+Z to main window<br />
+			<span class="add">●</span> double-click speed variable in the cfg file (dbl_click_speed)<br />
+			<span class="amend">●</span> slightly increased double click speed
+		</p>
 
-v2.07 – March 26 2020 (post)
-+ option to show favorites when the search box is empty
-+ ability to reorder favorites with Alt + Shift + Up/Down
+		<p class="release">
+			v2.01 - March 18 2020 (post)<br />
+			<span class="amend">●</span> temporarily disable VST cross-checking
+		</p>
 
-v2.05 – March 22 2020 (post)
-+ option to toggle FX/track template GUI floating after insertion
-+ prompt to insert tracks to put FX on, when there are no tracks in project
-and master track is unselected
-+ pass Ctrl(Cmd)+Z and Ctrl(Cmd)+Shift+Z to main window
-+ double-click speed variable in the cfg file (dbl_click_speed)
-# slightly increased double click speed
+		<p class="release">
+			v2.0 - March 17 2020<br />
+			<span class="add">●</span>  initial release
+		</p>
 
-v2.01 - March 18 2020 (post)
-# temporarily disable VST cross-checking
+	</body>
+</html>
