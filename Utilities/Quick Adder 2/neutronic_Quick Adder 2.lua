@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.34
+Version: 2.35
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,9 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + LeftWin + Alt + Enter: insert FX on a new track above the first selected track
-    or the track under mouse cursor (Ctrl + Option + Return on macOS)
-  # ignore "Auto-float newly created FX windows" in REAPER preferences
+  # fix redundant extension check in some cases
 --]]
 
 local rpr = {}
@@ -5521,6 +5519,15 @@ function getExt()
   gui.wnd_w = 400 * config.multi
   local sws = reaper.CF_EnumerateActions and 1 or 0
   local js = reaper.JS_Mouse_LoadCursor and 1 or 0
+  
+  if sws == 1 and js == 1 then
+    config.ext_check = false
+    gui.wnd_w = getMainW()
+    gui.w = gui.wnd_w - gui.border * (config.undock and 2 or 5)
+    gui.reinit = true
+    return
+  end
+  
   local api = ((sws == "" or js == "") and " API.") or " APIs."
   local str = "Some functionality of the script requires:"
   
