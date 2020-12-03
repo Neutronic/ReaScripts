@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.35
+Version: 2.36
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fix redundant extension check in some cases
+  # more extension check fixes for macOS (non-retina with zero favorites)
 --]]
 
 local rpr = {}
@@ -2194,8 +2194,10 @@ initFonts()
 
 function macAdjustGfxH()
   if config.retina then return end
+  
   gui.wnd_h = os_is.mac and (gui.wnd_h <= scr.vp_h and gui.wnd_h or scr.vp_h) or gui.wnd_h
-  gui.wnd_h_save = os_is.mac and (gui.wnd_h_save <= scr.vp_h and gui.wnd_h_save or scr.vp_h) or gui.wnd_h
+  gui.wnd_h_save = os_is.mac and (gui.wnd_h_save and (gui.wnd_h_save <= scr.vp_h and
+                                  gui.wnd_h_save or scr.vp_h) or gui.wnd_h) or gui.wnd_h
 end
 
 function getPrefsW()
