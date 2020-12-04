@@ -3743,10 +3743,10 @@ scr.actions.noSelTracks = function(val)
   end
 end
 
-
 scr.actions.refreshDb = function()
   db.saved = false
   getDb(true)
+  db.saved = true
 end
 
 scr.actions.reorderFilters = function(_, o)
@@ -5516,6 +5516,7 @@ function getExt()
     config.db_scan_wait = true
     db.saved = true
   end
+  
   gui.Row1 = {h = math.floor(gui.row_h * 0.5)}
   gui.wnd_h = 200 * config.multi
   gui.wnd_w = 400 * config.multi
@@ -5527,6 +5528,7 @@ function getExt()
     gui.wnd_w = getMainW()
     gui.w = gui.wnd_w - gui.border * (config.undock and 2 or 5)
     gui.reinit = true
+    scr.actions.refreshDb(true)
     return
   end
   
