@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="bc2f28ebdf63302e484e9441b6d4549f8a262275">
+<index version="1" name="Neutronic Scripts" commit="fc739a93d4da1620147c2a5732be8ab50880afaf">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -507,6 +507,21 @@ sends selected tracks (or track under mouse) to it
       <version name="2.36" author="Neutronic" time="2020-12-03T18:33:51Z">
         <changelog><![CDATA[# more extension check fixes for macOS (non-retina with zero favorites)]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/bc2f28ebdf63302e484e9441b6d4549f8a262275/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.40" author="Neutronic" time="2021-01-12T14:33:15Z">
+        <changelog><![CDATA[+ scrollable results: introducing scrollbar and scrollwheel support
++ list all relevant entries if search bar is empty
++ display number of matches in hints bar
++ enhanced database scanning logic
++ provide short information on what is being scanned
++ prevent GUI lock when preparing database
+# do not refresh the list upon adding a match to favorites (enhances UX with new scrollable results)
+# fix crash when dropping FX on empty area and master track is selected
+# change "Always show favorites" to "List all if search is empty" (minds active filter)
+# change default Auto Refresh mode to "Do not auto refresh"
+# improved exact match searching
+# show correct FX GUI if ARA plugin is added and there are already other FX in chain]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/fc739a93d4da1620147c2a5732be8ab50880afaf/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
