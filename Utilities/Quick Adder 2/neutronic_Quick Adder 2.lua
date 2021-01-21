@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.40
+Version: 2.42
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,23 +10,14 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + scrollable results: introducing scrollbar and scrollwheel support
-  + list all relevant entries if search bar is empty
-  + display number of matches in hints bar
-  + enhanced database scanning logic
-  + provide short information on what is being scanned
-  + prevent GUI lock when preparing database
-  # do not refresh the list upon adding a match to favorites (enhances UX with new scrollable results)
-  # fix crash when dropping FX on empty area and master track is selected
-  # change "Always show favorites" to "List all if search is empty" (minds active filter)
-  # change default Auto Refresh mode to "Do not auto refresh"
-  # improved exact match searching
-  # show correct FX GUI if ARA plugin is added and there are already other FX in chain
+  + display main action shortcuts
+  + Linux support
 --]]
 
 local rpr = {}
 local scr = {}
-rpr.x64 = reaper.GetAppVersion():match(".-/%D-(64)") and true or nil
+
+rpr.x64 = reaper.GetAppVersion():match(".*(64)") and true or nil
 
 local cur_os = reaper.GetOS()
 local os_is = {win = cur_os:lower():match("win") and true or false,
@@ -728,19 +719,23 @@ end
 
 function exit_states()
   if scr.quit then return end
+  
   scr.quit = true
   local _, wnd_x, wnd_y, _, h = gfx.dock(-1, 0, 0, 0, 0)
-  
   wnd_y = macYoffset(retinaDivide(scr.temp_undock and os_is.mac and gui.wnd_h_save or gui.wnd_h),
                      retinaDivide((config.ext_check or scr.temp_undock and os_is.mac) and gui.wnd_h or 
                      gui.Row1.h + gui.row_h + gui.border * 2),
                      wnd_y)
-  
   config.wnd_x = wnd_x
   config.wnd_y = not config.undock and config.wnd_y or wnd_y
   config.version = scr.version
+  
   if config.default_mode then config.mode = config.default_mode end
+  
   if scr.temp_undock then config.undock = false end
+  
+  if get_db_txt then os.remove(scr.plugs) end
+  
   writeFile(scr.config, tableToString("config", config))
   writeFile(scr.config, tableToString("global_types", global_types), "a")
   writeFile(scr.config, tableToString("global_types_order", global_types_order), "a")
@@ -869,6 +864,8 @@ end
 function getDb(refresh)
   if not db.saved then
     function dbDefer()
+        if gui.ch == -1 then return end
+        
         get_db = true
         if config.fol_search then
           local fx_folders_ini = getContent(rpr.fx_folders)
@@ -1745,7 +1742,7 @@ function getResultsList(fx_type, fx_only, ins_only)
           l:match("^%w-i:")) and config.mode == "FX" or
           config.mode == "FOLDER" and not l:match("\t.+") then
           skip = true
-        goto LOOP_END
+        if fx_type == "FAV" then goto LOOP_END else break end
       end
     elseif config.mode == "INSTRUMENT" and not l:match("^%w+i:") then
       skip = true
@@ -2072,7 +2069,8 @@ function urlOpen(url)
   elseif os_is.mac then
     reaper.ExecProcess("/usr/bin/open " .. url, 0)
   elseif os_is.lin then
-    os.execute('xdg-open "" "' .. url .. '"')    
+    reaper.ExecProcess('xdg-open "' .. url .. '"', 0)
+    --reaper.ExecProcess('python3 -m webbrowser "' .. url .. '"', 0)
   end
 end
 
@@ -2305,7 +2303,7 @@ function fontStyle(str)
 end
 
 function fontSzAdjust(sz, adj, special)
-  if os_is.mac then
+  if os_is.mac or os_is.lin then
     sz = sz - adj -- 7 for the pin button, 3 for all, 4 for FX button
   end
   return (sz - (special and not config.undock and 2 or 0)) * config.multi
@@ -2315,18 +2313,18 @@ function initFonts()
   gfx.setfont(1, "Arial", fontSzAdjust(12, 2), fontStyle("")) -- prefs
   gfx.setfont(2, "Arial", fontSzAdjust(config.multi == 1 and 13 or 12, config.multi == 1 and 3 or 2), fontStyle("")) -- hints
   gfx.setfont(3, "Arial", fontSzAdjust(13, config.multi == 1 and 3 or 2), fontStyle("b")) -- mode
-  gfx.setfont(4, "Arial", fontSzAdjust(16, 3), fontStyle("")) -- reminder bttn
+  gfx.setfont(4, "Arial Bold", fontSzAdjust(16, 3), fontStyle("")) -- reminder bttn
   gfx.setfont(5, "Arial", fontSzAdjust(18, 2, true), fontStyle("")) -- results
   gfx.setfont(6, "Arial", fontSzAdjust(22, 7), fontStyle("")) -- pin bttn
-  gfx.setfont(7, "Arial", fontSzAdjust(30, 4), fontStyle("")) -- search
-  gfx.setfont(15, "Arial", fontSzAdjust(25, config.multi == 1 and 4 or 2), fontStyle("")) -- search clear
+  gfx.setfont(7, os_is.lin and "Arial Bold" or "Arial", fontSzAdjust(30, 4), fontStyle("")) -- search
   gfx.setfont(8, "Arial", fontSzAdjust(35, 55), fontStyle("")) -- star
   gfx.setfont(9, "Arial", fontSzAdjust(11, 2), fontStyle("b")) -- nav tabs
   gfx.setfont(10, "Arial", fontSzAdjust(12, 2), fontStyle("b")) -- reminder, type tags
-  gfx.setfont(11, "Arial", fontSzAdjust(9, 2), fontStyle("b")) -- little results star
+  gfx.setfont(11, "Arial Bold", fontSzAdjust(os_is.lin and 12 or 9, 2), fontStyle("b")) -- little results star
   gfx.setfont(12, "Arial", fontSzAdjust(40, 2), fontStyle("b")) -- telephone recorder
   gfx.setfont(13, os_is.win and "Calibri" or "Arial", fontSzAdjust(15, 4), fontStyle(""))
   gfx.setfont(14, os_is.win and "Calibri" or "Arial", fontSzAdjust(14, 4), fontStyle("")) -- dd
+  gfx.setfont(15, "Arial", fontSzAdjust(25, config.multi == 1 and 4 or 2), fontStyle("")) -- search clear
 end
 
 initFonts()
@@ -2374,7 +2372,7 @@ function gui:init()
     if not config.undock then scr.main_w_rs = gui.wnd_w end
     scr.vp_w, scr.vp_h = getResolution(true)
     local wnd_x = config.wnd_x or (scr.vp_w - gui.wnd_w)/2 - 8
-    local wnd_y = config.wnd_y or os_is.win and 200 or (scr.vp_h - gui.wnd_h)/2 + 150
+    local wnd_y = config.wnd_y or (os_is.win or os_is.lin and 200) or (scr.vp_h - gui.wnd_h)/2 + 150
     gui.open = true
     gfx.ext_retina = 1
     local init_retina = config.retina
@@ -2594,7 +2592,7 @@ end
 function gui.theme:prefs()
   self.c = gui.bg_hue
   self.pad_x = 0
-  self.pad_y = os_is.mac and (self.txt and 3 * config.multi or config.multi == 1 and
+  self.pad_y = (os_is.mac or os_is.lin) and (self.txt and 3 * config.multi or (config.multi == 1 or os_is.lin) and
                              (self.id:match("^view.+") and -1 or not self.id:match("^view.+") and 0) or
                               2) or 0
   self.font = self.txt and 13 or 1
@@ -2832,8 +2830,6 @@ function gui:onClick()
     gui.click_ignore = nil
   elseif gui.m_cap == 0 and gui.old_sb_offset then
     gui.old_sb_offset = nil
-  elseif gui.m_cap == 0 and scr.check_last_result_y then
-    scr.check_last_result_y = nil
   end
 end
 
@@ -3107,7 +3103,7 @@ function gui:drawTxt(str, shrink, change_w, change_h, pad_w, pad_h, measure_only
   color(self.font_c)
   str = self.upper and str:upper() or self.lower and str:lower() or
         self.cap and str:gsub("^%a", string.upper) or str
-  gfx.x = self.x1 + math.floor((self.pad_x or 0) * config.multi)
+  gfx.x = self.x1 + math.floor((self.pad_x or 0) * config.multi) + (self.pad_x2 or 0)
   local pad_y = 0
   pad_y = --[[os_is.mac and self.font == 13 and pad_y + 3 or os_is.win and self.font == 13 and pad_y - 1 or ]]self.pad_y
   gfx.y = self.y1 + (pad_y or 0)
@@ -3238,7 +3234,7 @@ function gui:getMode()
   elseif config.mode == "FAV" then
     self.font = 8
     self.pad_y = fontSzAdjust(-4, -4)
-    self.pad_x = os_is.win and 1 or 0
+    self.pad_x = (os_is.win or os_is.lin) and 1 or 0
     self:drawTxt(utf8.char(9733)) -- filled star
     self:setStyle("mode_txt")
   else
@@ -3348,14 +3344,14 @@ function a_textbox()end
 
 function gui:textBox(ch, shrink)
   gfx.setfont(self.font)
-  
+ 
   if gui.str == "" then
     gui.str_temp = "" gui.str_a = ""
-    if ch == white_ch.del or ch == white_ch.bs then
+    if not ch or ch == 0 or ch == white_ch.del or ch == white_ch.bs then
       goto SKIP_CH
     end
   end
-  
+
   if get_db_txt then 
     --self.font_c = self.font_c + (config.theme == "light" and 100 or -100)
     self:drawTxt(gui.str, _, _, _, _, _, _, str_start_px)
@@ -3424,6 +3420,7 @@ function gui:textBox(ch, shrink)
         gui.str_a = gui.str
         timers.search_suspend = timer:new():start(search_delay)
       end
+
       if gui.str == "" then scr.actions.clear() end
     elseif gui.m_cap == 0 and not gui.txt_hl then -- if backspace
       if gui.b_count == 0 then -- if string is not split
@@ -3696,7 +3693,7 @@ scr.actions.fav = function(id)
     if db.FAV[i] == fav then
       table.remove(db.FAV, i)
       scr.results_list[id] = result
-      if gui.str == "" then scr.actions.clear(_, true) end
+      scr.actions.clear(_, true, gui.Results.sel, true) 
       return
     end
     if i == #db.FAV then
@@ -3716,7 +3713,8 @@ scr.actions.favReorder = function()
      scr.results_list[gui.Results.sel-1]:match(".+|,|(.+)") == "fav" then
     prev = scr.results_list[gui.Results.sel-1]
     prev_n = gui.Results.sel-1
-    gui.list_start_offset = prev_n - gui.list_start_offset <= 0 and prev_n - 1 or
+    gui.list_start_offset = prev_n > #gui.Results + gui.list_start_offset and prev_n - config.results_max or
+                            prev_n - gui.list_start_offset <= 0 and prev_n - 1 or
                             gui.list_start_offset
   elseif gui.ch == ignore_ch.down and
          scr.results_list[gui.Results.sel+1]:match(".+|,|(.+)") == "fav" then
@@ -3941,6 +3939,7 @@ end
 
 function a_refreshDb()end
 scr.actions.refreshDb = function()
+  scr.db_total = nil
   db.saved = false
   local fav = db.FAV
   db = {}
@@ -4352,13 +4351,16 @@ gui.hints.generate = function(id)
   end]]
   
   if gui.view == "main" and #scr.results_list > 0 and gui.Results.sel then
-    if config.ext_check or gui.dd_items then goto SKIP end
-    if gui.m_cap == mouse_mod.alt + mouse_mod.shift and
+    if config.ext_check or gui.dd_items then
+      goto SKIP
+    elseif gui.m_cap == mouse_mod.alt + mouse_mod.shift and
        select(4, gui.parseResult(scr.results_list[gui.Results.sel])) ~= "" then
        gui.hints_txt = "Move the favorite up or down " ..
                        "[" .. mouse_mod[mouse_mod.alt]() .. " + "
                        .. mouse_mod[mouse_mod.shift]() .. " + Up/Down]"
        return
+    elseif select(2, gui.parseResult(scr.results_list[gui.Results.sel])) == "ACT" then
+      goto SKIP
     elseif gui.m_cap == mouse_mod.track + mouse_mod.clear + (gfx.mouse_cap&mouse_mod.lmb) and
            not scr.results_list[gui.Results.sel]:match("TEMPLATE") then
       gui.hints_txt = "Clear track FX chain and add FX " ..
@@ -4426,7 +4428,7 @@ gui.hints.generate = function(id)
       return
       end
     end
-    
+
     if config.results_max == 0 and #scr.results_list > 0 and
        gui.str ~= "" then
       local fx_name, fx_type = gui.parseResult(scr.results_list[gui.Results.sel])
@@ -4435,7 +4437,7 @@ gui.hints.generate = function(id)
     end
     
     if gui.dd_items then gui.hints_txt = "Choose a search filter" return end
-    
+
     if id == "hints" then
       gui.hints_txt = "Right-click here to " ..
       (scr.dock == 0 and "dock" or "undock") .. " Quick Adder"
@@ -4466,7 +4468,7 @@ gui.hints.generate = function(id)
                        "Add the result to favorites") .. " [" .. mouse_mod[16]() .. " + F]"
     elseif id == "clear" and gui.str ~= "" then
       gui.hints_txt = "Clear search query [Esc]"
-    elseif #scr.query_parts > 0 then
+    elseif scr.query_parts and #scr.query_parts > 0 then
       gui.hints_txt =  #scr.results_list .. " matches found"
     elseif gui.over ~= "view_main" then
       gui.hints_txt = "Press F1 for the help file"
@@ -4500,34 +4502,37 @@ function gui.parseResult(str)
   
   local fx_type, name, path, i, id, fav = str:match("(.-):(.-)|,|(.-)|,|(.-)|,|(.-)|,|(.*)")
   
+  local section, section_n, retval, shortcut = i:lower():match("(.+)/(.+)")
+  section = section and " (" .. section .. ")" or section
+  shortcut = ""  
+   
   if fx_type == "JS" then
     path = name:match("Video processor") and "Built-in effect" or "/Effects/" .. path
   elseif name:match("SWS.-:") or name:match("^Custom.-:") then
     local ext = name:match("SWS.-:") and "SWS" or name:match("^Custom.-:") and "Custom"
           or "Ext"
     name = name:gsub("%(.-%)", "/%0/")      
-    name = name:gsub("(.-" .. ext .. ".-): (.+)", function(a,b) return b ..
-    " (" .. i:match("(.+)/.+"):lower() .. ") (" .. a:lower() .. ")" end)
+    name = name:gsub("(.-" .. ext .. ".-): (.+)", function(a,b) return b .. shortcut ..
+    section .. " (" .. a:lower() .. ")" end)
   elseif path:match("CYCLACTION") then
-    name = name .. " (" .. i:match("(.+)/.+") .. ") (S&M | Cycle)"
+    name = name .. shortcut .. section .. " (S&M | Cycle)"
   elseif name:match("Script:") then
     name = name:gsub("Script: ", "")
     name = name:gsub("%(.-%)", "/%0/")
     name = name:gsub("(.+)%.(.-)$", "%1 (%2)")
-    name = name:gsub("(.-)_(.-) (%(.+%))", function(a,b,c) return b ..
-    " (" .. i:match("(.+)/.+"):lower() .. ") (" .. a:lower() .. ") " .. c:lower() end)
+    name = name:gsub("(.-)_(.-) (%(.+%))", function(a,b,c) return b .. shortcut ..
+    section .. " (" .. a:lower() .. ") " .. c:lower() end)
   elseif fx_type == "ACTION" then
     local pref = name:lower():match("^(.-):")
     name = name:gsub("^.-: ", ""):gsub("%(.-%)", "/%0/")
-    name = name .. " (" .. i:lower():match("(.+)/.+") .. ")" .. (pref and " (" .. pref .. ")" or "")
+    name = name .. shortcut .. section .. (pref and " (" .. pref .. ")" or "")
   else
     path = path:gsub(rpr.path, "")
   end
    
   if fx_type == "ACTION" then
     fx_type = "ACT"
-    local section = i:match(".+/(.+)")
-    local state = reaper.GetToggleCommandStateEx(section, id)
+    local state = reaper.GetToggleCommandStateEx(section_n, id)
     name = name .. (state == 1 and " (on)" or state == 0 and " (off)" or "")
   elseif fx_type ~= "TEMPLATE" then
     local folder_name = name:match("\t.+") or ""
@@ -4593,6 +4598,7 @@ function mainView()
   gui.wnd_h = gui.border * 2
   
   pcall(gui.hints.generate, gui.over)
+  
   gui.Row1 = gui:setChild({id = "row1", h = math.floor(gui.row_h * 0.5), cursor = "arrow"}, true)
   gui.Row1.Reminder = gui.Row1:setChild{id = "reminder", bttn = true, on_select = true, w = gui.Row1.h,
                       x1 = config.reminder and gui.border + gui.Row1.w - gui.Row1.h or gui.Row1.x2-
@@ -4643,14 +4649,17 @@ function mainView()
                                config.multi == res_multi["|720p"] and 1 or
                                config.multi == res_multi["|1080p"] and -2 or
                                config.multi > 2 and -4
-                               ) or 
+                               ) or
+                               os_is.lin and not gui.reminder_seen and
+                               (config.multi > 2 and config.multi or config.multi > 1 and 2) or
                                os_is.mac and config.multi == 1 and 2 or
                                gui.Row1.Reminder.pad_y
-    gui.Row1.Reminder.pad_x = os_is.mac and gui.reminder_seen and (
+    gui.Row1.Reminder.pad_x = (os_is.mac and gui.reminder_seen or os_is.lin and not gui.reminder_seen) and (
                                config.multi == res_multi["|1080p"] and 2 or
-                               config.multi > 2 and 1
-                               ) or gui.Row1.Reminder.pad_x                           
-    gui.Row1.Reminder:drawTxt(gui.reminder_seen and "✕" or "♥") -- ❤ ♥
+                               config.multi > 2 and 1) or
+                               gui.Row1.Reminder.pad_x
+                               
+    gui.Row1.Reminder:drawTxt(gui.reminder_seen and ("✕") or "♥")
     gui.Row1.Reminder:hover()
  end
   gui.Row1.Prefs:setStyle("prefs"):setStyle("txt"):drawRect():drawTxt("PREFS")
@@ -4686,15 +4695,15 @@ function mainView()
   gui.Row2.Search.Clear:setStyle("search_txt")
   gui.Row2.Search.Clear.txt_align = gui.txt_align["center"]
   gui.Row2.Search.Clear.pad_x = config.multi < 2 and 1 or 0
-  gui.Row2.Search.Clear.pad_y = os_is.mac and config.multi == res_multi["|720p"] and 2 or
-                                os_is.mac and config.multi == res_multi["|1080p"] and 3 or
-                                os_is.mac and config.multi == res_multi["|4k"] and 5 or
-                                os_is.mac and config.multi == res_multi["|5k"] and 9 or
-                                os_is.mac and config.multi == res_multi["|8k"] and 12 or
+  gui.Row2.Search.Clear.pad_y = (os_is.mac or os_is.lin) and config.multi == res_multi["|720p"] and 2 or
+                                (os_is.mac or os_is.lin) and config.multi == res_multi["|1080p"] and 3 or
+                                (os_is.mac or os_is.lin) and config.multi == res_multi["|4k"] and 5 or
+                                (os_is.mac or os_is.lin) and config.multi == res_multi["|5k"] and 9 or
+                                (os_is.mac or os_is.lin) and config.multi == res_multi["|8k"] and 12 or
                                 config.multi == res_multi["|720p"] and -2 or
                                 config.multi == res_multi["|1080p"] and -3 or
                                 config.multi > 2 and -7
-  if gui.str ~= "" then
+  if gui.str ~= "" and not get_db_txt then
     gui.Row2.Search.Clear.bttn = true
     gui.Row2.Search.Clear.on_select = true
     gui.Row2.Search.Clear:hover(true):drawRect():drawTxt("✕")
@@ -4766,7 +4775,7 @@ function mainView()
   end
   
   for i = 1, #scr.results_list > 0 and #gui.Results or 0 do
-    local name, fx_type, instr, fav, path = gui.parseResult(scr.results_list[i+gui.list_start_offset])
+    local name, fx_type, instr, fav, path, id = gui.parseResult(scr.results_list[i+gui.list_start_offset])
     gui.Results[i]:setStyle("search")
     if gui.Results.sel == i + gui.list_start_offset then
       gui.Results[i].font_c = config.theme == "light" and gui.Results[i].c or gui.Results[i].font_c
@@ -4802,6 +4811,8 @@ function mainView()
       if gui.active and gui.active.id == gui.Results[i].fav.id then
         gui.Results[i].fav:drawRect()
       end
+      
+      gui.Results[i].fav.pad_x = os_is.lin and 2 or 0
       
       if fav ~= "" then
         gui.Results[i].fav:drawTxt(utf8.char(9733)) -- filled star
@@ -4844,7 +4855,8 @@ function mainView()
     local w2, h2 = gfx.measurestr(name2)
     name2 = truncateString(gui.Results[i].result.x1, gui.Results[i].result.x2, name2, w2, 10)
     local y_offset = not config.undock and -1*math.floor(config.multi) or 0
-    gui.Results[i].result.pad_y = (gui.Results[i].result.h - h1 - h2) / 2 + (os_is.mac and 1 + y_offset or y_offset)
+    gui.Results[i].result.pad_y = (gui.Results[i].result.h - h1 - h2) / 2 + (os_is.mac and 1 + y_offset or
+                                   y_offset - config.multi)
     gui.Results[i].result.font = 5
     gui.Results[i].result.font_c = gui.Results[i].result.font_c + 10
     gui.Results[i].result.txt_align = gui.txt_align["none"]
@@ -4854,24 +4866,73 @@ function mainView()
     if gui.Results.sel ~= i + gui.list_start_offset then
       gui.Results[i].result.font_c = gui.Results[i].result.font_c + (config.theme == "light" and 40 or -40)
     end
-    gui.Results[i].result.font = 1
 
-    y_offset = not config.undock and (os_is.mac and 3 or 2)*config.multi or 0
+    y_offset = not config.undock and ((os_is.mac or os_is.lin) and 3 or 2)*config.multi or
+                                      os_is.lin and -1 or 0
     gui.Results[i].result.pad_y = gui.Results[i].result.pad_y + gui.Results[i].result.h - h1 - 
                                   (os_is.mac and -2 + y_offset or
                                   (config.multi > 1 and config.multi < 3 and math.floor(config.multi) + y_offset or
                                   config.multi > 4 and 3 + y_offset or y_offset))
+    
+    local section, section_n, retval, shortcut = instr:lower():match("(.+)/(.+)")
+    
+    if reaper.JS_Actions_GetShortcutDesc and instr:match(".+/.+") then -- action shortcuts
+      retval, shortcut = reaper.JS_Actions_GetShortcutDesc(section_n, id, 0)
+      shortcut = retval and shortcut  or ""
+      
+      if os_is.mac then
+        shortcut = shortcut:lower():gsub("opt%+", --[[mouse_mod[mouse_mod.alt]() .. ]]"OPT + ")
+        shortcut = shortcut:lower():gsub("cmd%+", --[[mouse_mod[mouse_mod.ctrl]() .. ]]"CMD + ")
+        shortcut = shortcut:lower():gsub("ctrl%+", --[[mouse_mod[mouse_mod.win]() .. ]]"CTRL + ")
+      elseif os_is.win then
+        shortcut = shortcut:lower():gsub("alt%+", mouse_mod[mouse_mod.alt]() .. " + ")
+        shortcut = shortcut:lower():gsub("ctrl%+", mouse_mod[mouse_mod.ctrl]() .. " + ")
+        shortcut = shortcut:lower():gsub("win%+", mouse_mod[mouse_mod.win]() .. " + ")
+      end
+      
+      shortcut = shortcut:lower():gsub("shift%+", --[[mouse_mod[mouse_mod.shift]() .. ]]"SHIFT + ")
+    else
+      shortcut = ""
+    end
+    
+    gui.Results[i].result.font = 1
+    
+    if retval then
+      gfx.setfont(gui.Results[i].result.font)
+      
+      shortcut = (" " .. shortcut .. " "):upper()
+      
+      local shortcut_w, shortcut_h = gfx.measurestr(shortcut)
+      
+      color(gui.Results[i].result.font_c)
+      
+      gfx.rect(gui.Results[i].result.x1 + math.floor(gui.Results[i].result.pad_x * config.multi),
+               gui.Results[i].result.y1 + gui.Results[i].result.pad_y,-- - (os_is.mac and math.floor(config.multi) or 0),
+               shortcut_w, shortcut_h, true)
+      
+      local font_c_temp = gui.Results[i].result.font_c
+      
+      gui.Results[i].result.font_c = gui.Results[i].g and gui.Row1.Prefs.font_c or gui.Results[i].result.c
+      
+      gui.Results[i].result:drawTxt(shortcut)
+      
+      gui.Results[i].result.pad_x2 = shortcut_w + gfx.measurestr(" ")
+      
+      gui.Results[i].result.font_c = font_c_temp
+    end
+ 
     gui.Results[i].result:drawTxt(name2)
   end
 
   if not config.undock and config.results_ph then -- result placeholders
     gui.Row3 = gui:setChild({id = "row3", h = gfx.h - gui.wnd_h - 4,
-                             y1 = #scr.results_list > 0 and gui.Results[#gui.Results].y2 or gui.Row2.y2,
+                             y1 = #scr.results_list > 0 and #gui.Results > 0 and gui.Results[#gui.Results].y2 or
+                             gui.Row2.y2,
                              cursor = "arrow"}, true)
     color(gui.bg_hue + 4)
     local y_offset = 6 * math.floor(config.multi)
-    local y = ((#scr.results_list > 0 and gui.Results[#gui.Results].y2 or gui.Row2.Search.y2)) +
-          y_offset
+    local y = ((#scr.results_list > 0 and #gui.Results > 0 and gui.Results[#gui.Results].y2 or
+                gui.Row2.Search.y2)) + y_offset
     local h = gui.Row2.h - 6 * math.floor(config.multi)
     for i = 1, config.results_max do
       gfx.rect(gui.Row2.x1 + 5 * math.floor(config.multi),
@@ -4889,7 +4950,7 @@ function mainView()
   end
   
   
-  if not config.undock and #scr.results_list > 0 then -- last result underline when docked
+  if not config.undock and #scr.results_list > 0 and #gui.Results > 0 then -- last result underline when docked
     color(gui.Row2.Search.c)
     gfx.line(gui.Row2.x1,
              gui.Results[#gui.Results].result.y2-1,
@@ -4994,11 +5055,11 @@ function mainView()
   
   ---- SEARCH BOX with LAST RESULT UNERLINE ----
   
-  if not get_db then
+  if not get_db_txt then
     gui.Row2.Search:textBox(gui.ch, gui.Row2.Search.Clear.w)
   end
     
-  if gui.str == "" or get_db then
+  if gui.str == "" or get_db_txt then
     gui.Row2.Search.pad_x = gui.Row2.Search.pad_x + 3
     gui.Row2.Search.pad_y = 1 * math.floor(config.multi)
     gui.Row2.Search.txt_align = gui.txt_align["vert"]
@@ -5167,12 +5228,13 @@ function a_scrollwheel()end
     gui.list_start_offset = set and gui.list_start_offset + incr or gui.list_start_offset
 
     ::SKIP::
-    gfx.mouse_wheel = 0
-    if not config.undock and not scr.check_last_result_y and #scr.results_list and
+    
+    if not config.undock and gfx.mouse_wheel < 0 and #scr.results_list and
        gui.list_start_offset + #gui.Results == #scr.results_list and gui.Results[#gui.Results].y2 > gfx.h then
-      scr.check_last_result_y = true
       gui.list_start_offset = gui.list_start_offset + 1
     end
+    
+    gfx.mouse_wheel = 0
   elseif gui.m_cap == mouse_mod.ctrl and gui.ch == 1 and gui.str ~= "" then -- CTRL+A
     gui.b_count = 0
     gui.str_hl_start = 1
@@ -5487,7 +5549,7 @@ gui.prefs_page = function(page)
                                          }, nil, nil, padding, padding)
       
     gui.Prefs.Body.Section_3.Cb_2:drawRect():setStyle("search")
-    gui.Prefs.Body.Section_3.Cb_2:drawCb("Clear search box after insertion")
+    gui.Prefs.Body.Section_3.Cb_2:drawCb("Clear search after insertion")
     
     -- SEARCH ACTION LIST
     if reaper.CF_EnumerateActions then
@@ -5705,7 +5767,8 @@ gui.prefs_page = function(page)
                              float_b = gui.Prefs.Nav}, true, true, padding, padding * 1.5, true)
                              
     gui.Prefs.Body.Section_2 = gui.Prefs.Body:setChild({id = "Section_2", h = (67 + padding) * config.multi,
-                             float_b = gui.Prefs.Body.Section_1}, true, true, padding, padding * 1.5, true, true)
+                             float_b = gui.Prefs.Body.Section_1}, true, true, padding,
+                             padding * (os_is.lin and 1.9 or 1.5), true, true)
                                  
     gui.Prefs.Body:drawRect(1):hover()
     gui.Prefs.Body:setStyle("search")
@@ -5727,12 +5790,13 @@ gui.prefs_page = function(page)
                                       float_b = gui.Prefs.Body.Section_1.Title},
                                       nil, nil, padding, padding * 0.5):setLink()
         
+    local line_space = os_is.lin and 0.4 or 0.1
     
     gui.Prefs.Body.Section_1.Link_2 = gui.Prefs.Body.Section_1:setChild({id = "link_2", link = true,
                                       url = "help",
                                       txt = "Learn all the ways you can use the script [F1]",
                                       float_b = gui.Prefs.Body.Section_1.Link_1},
-                                      nil, nil, padding, padding * 0.1):setLink()
+                                      nil, nil, padding, padding * line_space):setLink()
 
     
     
@@ -5740,7 +5804,7 @@ gui.prefs_page = function(page)
                                       url = scr.links[4],
                                       txt = "Watch the demo video on YouTube",
                                       float_b = gui.Prefs.Body.Section_1.Link_2},
-                                      nil, nil, padding, padding * 0.1):setLink()
+                                      nil, nil, padding, padding * line_space):setLink()
     
 
     
@@ -5748,7 +5812,7 @@ gui.prefs_page = function(page)
                                       url = scr.links[3],
                                       txt = "Discuss the script in the REAPER forum thread",
                                       float_b = gui.Prefs.Body.Section_1.Link_3},
-                                      nil, nil, padding, padding * 0.1):setLink()
+                                      nil, nil, padding, padding * line_space):setLink()
                             
     gui.Prefs.Body.Section_2.Title = gui.Prefs.Body.Section_2:setChild{id = "", x1 = gui.Prefs.Body.Section_2.x1 + 5 * config.multi,
                                                                        txt = "Neutronic",
@@ -5768,7 +5832,7 @@ gui.prefs_page = function(page)
                                       url = "https://github.com/Neutronic/ReaScripts",
                                       txt = "GitHub ReaScripts repository",
                                       float_b = gui.Prefs.Body.Section_2.Link_1},
-                                      nil, nil, padding, padding * 0.1):setLink()
+                                      nil, nil, padding, padding * line_space):setLink()
                             
   end
 end
@@ -5802,7 +5866,7 @@ function prefsView()
   gui.Prefs.Nav.General:setStyle("search"):drawRect():drawTxt("GENERAL")
   
   
-  gui.Prefs.Nav.TT = gui.Prefs.Nav:setChild{id = "nav_templates", nav_bttn = true, w = 65 * config.multi,
+  gui.Prefs.Nav.TT = gui.Prefs.Nav:setChild{id = "nav_templates", nav_bttn = true, w = 75 * config.multi,
                                             on_select = true, float_r = gui.Prefs.Nav.General}
   
   gui.Prefs.Nav.TT:setStyle("search"):drawRect(_,_,true):drawTxt("TEMPLATES")
@@ -5844,7 +5908,7 @@ function getMobj()
   
   if gui.m_cap&mouse_mod.lmb == 1 and gui.m_cap ~= 25 and
      gui.active and gui.active.id:match("^result") and
-     #scr.results_list > 0  then
+     #scr.results_list > 0 and not scr.results_list[gui.Results.sel]:match("^ACTION") then
     if gui.m_x_click ~= gui.m_x or gui.m_y_click ~= gui.m_y then
       if reaper.JS_Mouse_LoadCursor then
         if m_obj then 
@@ -5860,7 +5924,7 @@ function getMobj()
           end
         else
           if gui.m_cursor ~= "cantdrop" then
-            setCursor(182, "cantdrop")
+            setCursor(32648, "cantdrop")
           end
         end
       end
@@ -6144,22 +6208,25 @@ function main()
       
       gui.Results = {sel = (gui.ch == ignore_ch.f7 or gui.ch == ignore_ch.f8) and
                      (gui.Results.sel <= config.results_max and gui.Results.sel or
-                      config.results_max) or 1}
+                      config.results_max) or scr.fav_reorder and gui.Results.sel or 1}
 
-      gui.list_start_offset = 0
+      gui.list_start_offset = scr.fav_reorder and gui.list_start_offset or 0
       parseQuery()
+      scr.fav_reorder = nil
       scr.re_search = nil
       match_stop = nil
     elseif config.fav_persist and config.results_max > 0 and db[global_types_order[#global_types_order]] and
            (gui.str == "" and #scr.results_list == 0 and #db.FAV > 0 or scr.re_search) then
 
-      scr.actions.clear(_, true, gui.Results.sel <= config.results_max and gui.Results.sel or
-                                 config.results_max > 0 and config.results_max or 1)
       
-      scr.re_search = nil
-      scr.fav_reorder = nil
+      if not scr.fav_reorder then
+        scr.actions.clear(_, true, gui.Results.sel <= config.results_max and gui.Results.sel or
+                                   config.results_max > 0 and config.results_max or 1)
+      end
       
       doMatch()
+      scr.re_search = nil
+      scr.fav_reorder = nil
     elseif gui.str == "" and config.results_max == 0 and #scr.results_list > 0 then
       scr.results_list = {}
       scr.match_found = nil
