@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.42
+Version: 2.43
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,14 +10,19 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + display main action shortcuts
-  + Linux support
+  # fix compatibility issues with SWS 2.12.1.3+
+  # fix wrong results display for FOL filter
 --]]
 
 local rpr = {}
 local scr = {}
 
 rpr.x64 = reaper.GetAppVersion():match(".*(64)") and true or nil
+
+if reaper.CF_GetSWSVersion then
+  rpr.sws = reaper.CF_GetSWSVersion(""):gsub("%.", "")
+  rpr.sws = tonumber(rpr.sws)
+end
 
 local cur_os = reaper.GetOS()
 local os_is = {win = cur_os:lower():match("win") and true or false,
@@ -1655,7 +1660,8 @@ function getAction()
     for n = 1, #section do
       local id, name = reaper.CF_EnumerateActions(section[n].id, i, "")
       cntr = cntr + 1
-      if name ~= "" then
+      if (rpr.sws >= 21213 and name ~= "(null)") or
+         (rpr.sws < 21213 and name ~= "") then
         local id_named = reaper.ReverseNamedCommandLookup(id) or ""
         
         local act = "ACTION:" .. name .. "|,|" .. id_named .. "|,|" ..
@@ -1737,17 +1743,16 @@ function getResultsList(fx_type, fx_only, ins_only)
     if not l then goto LOOP_END end
     l = l:lower()
 
-    if fx_only then
-      if (l:match("^chain") or l:match("^template") or l:match("^action") or
-          l:match("^%w-i:")) and config.mode == "FX" or
-          config.mode == "FOLDER" and not l:match("\t.+") then
-          skip = true
-        if fx_type == "FAV" then goto LOOP_END else break end
-      end
-    elseif config.mode == "INSTRUMENT" and not l:match("^%w+i:") then
-      skip = true
-      goto LOOP_END
+    if fx_only and (
+       config.mode == "FX" and
+       (l:match("^chain") or l:match("^template") or l:match("^action") or l:match("^%w-i:")) or
+       config.mode == "FOLDER" and not l:match("\t.+")
+                    ) or
+       config.mode == "INSTRUMENT" and not l:match("^%w+i:") then
+        skip = true
+        goto LOOP_END
     end
+    
     for m = 1, #scr.query_parts do
       local query = scr.query_parts[m]
       --
