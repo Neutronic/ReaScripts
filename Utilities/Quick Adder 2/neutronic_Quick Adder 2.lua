@@ -11,7 +11,7 @@ Links:
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
   # fix compatibility issues with SWS 2.12.1.3+
-  # fix wrong results display for FOL filter
+  # fix wrong results display for FOL and INS filters
 --]]
 
 local rpr = {}
