@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # ignore files with restricted access when scanning database
+  # ignore files with restricted access when preparing database
 --]]
 
 local rpr = {}
