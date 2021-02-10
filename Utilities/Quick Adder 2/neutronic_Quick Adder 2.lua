@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.43
+Version: 2.44
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,8 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # fix compatibility issues with SWS 2.12.1.3+
-  # fix incomplete results display for FOL and INS filters
+  # ignore files with restricted access when scanning database
 --]]
 
 local rpr = {}
@@ -31,7 +30,7 @@ local os_is = {win = cur_os:lower():match("win") and true or false,
 
 function getContent(path)
   local file = io.open(path)
-  if not file then return end
+  if not file then return "" end
   local content = file:read("*a")
   file:close()
   return content
