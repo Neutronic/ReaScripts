@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="2eadb7446535cbaeb7490774e284652a261076bb">
+<index version="1" name="Neutronic Scripts" commit="a347f9863d8729719a4da9a7219ee7406890fb78">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -119,7 +119,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Adds FX to selected tracks or takes and inserts track templates.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A unified solution for adding FX, inserting track templates and running actions in REAPER.\par}
 }
 ]]></description>
         <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
@@ -540,7 +540,7 @@ sends selected tracks (or track under mouse) to it
       <version name="2.45" author="Neutronic" time="2021-03-09T00:20:39Z">
         <changelog><![CDATA[# don't match vst_id in fxfolders.ini when the id is 0
 # case insensitive fxfolders.ini lookup]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/2eadb7446535cbaeb7490774e284652a261076bb/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/a347f9863d8729719a4da9a7219ee7406890fb78/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
