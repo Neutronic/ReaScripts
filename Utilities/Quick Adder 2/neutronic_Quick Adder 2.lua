@@ -1,6 +1,6 @@
 --[[
 Description: Quick Adder 2
-About: Adds FX to selected tracks or takes and inserts track templates.
+About: A unified solution for adding FX, inserting track templates and running actions in REAPER.
 Version: 2.45
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
