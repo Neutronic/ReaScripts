@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Adds FX to selected tracks or takes and inserts track templates.
-Version: 2.44
+Version: 2.45
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,7 +10,8 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # ignore files with restricted access when preparing database
+  # don't match vst_id in fxfolders.ini when the id is 0
+  # case insensitive fxfolders.ini lookup
 --]]
 
 local rpr = {}
@@ -291,6 +292,7 @@ function writeFile(path, str, manual)
 end
 
 function getFXfolder(str, type_n)
+  str = str:lower()
   local fx_folder = ""
   
   if not str then return fx_folder end
@@ -299,16 +301,18 @@ function getFXfolder(str, type_n)
   if type_n == 3 then -- if VST
     local vst_id, vst_file = str:match("(.-)//(.+)")
     for i = 1, fx_folders and #fx_folders or 0 do
-      if fx_folders[i].content and (fx_folders[i].content:match(vst_id) or
-         fx_folders[i].content:gsub("[^%w%.\n\r]", "_"):match(vst_file .. "[\n\r]")) then
+      if fx_folders[i].content and (vst_id ~= "0" and fx_folders[i].content:find(vst_id) or
+         fx_folders[i].content:find(vst_file .. "[\n\r]")) then
         fx_folder = fx_folder .. "\t" .. fx_folders[i].name
       end
     end
   else
+    str = str:gsub("[^%w%.\n\r]", "_")
     for i = 1, fx_folders and #fx_folders or 0 do
-      if fx_folders[i].content and fx_folders[i].content:match("Item%d+=" .. magicFix(str)) then
-        local fx_n = fx_folders[i].content:match("Item(%d+)=" .. magicFix(str))
-        if fx_folders[i].content:match("Type" .. fx_n .. "=" .. type_n) then
+      if fx_folders[i].content and fx_folders[i].content:match("item%d+_" .. magicFix(str)) then
+      if str:match("killer") then a = str end
+        local fx_n = fx_folders[i].content:match("item(%d+)_" .. magicFix(str))
+        if fx_folders[i].content:find("type" .. fx_n .. "_" .. type_n) then
           fx_folder = fx_folder .. "\t" .. fx_folders[i].name
         end
       end
@@ -887,7 +891,7 @@ function getDb(refresh)
             
               for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
                 local n, content = match:match("Folder(%d+)%](.+)")
-                fx_folders[n+1].content = content
+                fx_folders[n+1].content = content:gsub("[^%w%.\n\r]", "_"):lower()
               end
               fx_folders_ini = nil
             end
