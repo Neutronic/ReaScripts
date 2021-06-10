@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="7b12137829dc03afb283fba891465c5c393b3e30">
+<index version="1" name="Neutronic Scripts" commit="a54d4e2856c2179fed96f729b4ff97151eb6ab99">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -549,8 +549,8 @@ sends selected tracks (or track under mouse) to it
 + report QA2 state to REAPER action list and toolbars
 + auto-adjust GUI size when moving it from non-retina to retina screen and vice versa
 # fix showing results on QA2 launch (when "List all ..." is enabled)
-# fix mouse cursor flicker that occured in some cases]]></changelog>
-        <source main="main">https://github.com/Neutronic/ReaScripts/raw/7b12137829dc03afb283fba891465c5c393b3e30/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+# fix mouse cursor flicker that occurred in some cases]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/a54d4e2856c2179fed96f729b4ff97151eb6ab99/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
