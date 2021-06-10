@@ -16,7 +16,7 @@ Changelog:
   + report QA2 state to REAPER action list and toolbars
   + auto-adjust GUI size when moving it from non-retina to retina screen and vice versa
   # fix showing results on QA2 launch (when "List all ..." is enabled)
-  # fix mouse cursor flicker that occured in some cases
+  # fix mouse cursor flicker that occurred in some cases
 --]]
 
 local rpr = {}
