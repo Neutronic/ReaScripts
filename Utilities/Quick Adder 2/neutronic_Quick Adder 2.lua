@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
-About: A unified solution for adding FX, inserting track templates and running actions in REAPER.
-Version: 2.45
+About: Unified solution for adding FX, inserting track templates and running actions in REAPER.
+Version: 2.47
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,8 +10,13 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # don't match vst_id in fxfolders.ini when the id is 0
-  # case insensitive fxfolders.ini lookup
+  + support native Apple silicon REAPER builds (macOS-ARM)
+  + macOS-ARM: use correct font sizes
+  + macOS-ARM: scan relevant VST and AU ini files
+  + report QA2 state to REAPER action list and toolbars
+  + auto-adjust GUI size when moving it from non-retina to retina screen and vice versa
+  # fix showing results on QA2 launch (when "List all ..." is enabled)
+  # fix mouse cursor flicker that occured in some cases
 --]]
 
 local rpr = {}
@@ -26,7 +31,9 @@ end
 
 local cur_os = reaper.GetOS()
 local os_is = {win = cur_os:lower():match("win") and true or false,
-               mac = cur_os:lower():match("osx") and true or false,
+               mac = cur_os:lower():match("osx") or
+                     cur_os:lower():match("macos") and true or false,
+               mac_arm = cur_os:lower():match("macos") and true or false,
                lin = cur_os:lower():match("other") and true or false}
 
 function getContent(path)
@@ -66,7 +73,7 @@ function findContentKey(content, key, self)
   return content and content:gsub(key.. "[:=]%s?", "") or false
 end
 
-scr.path = select(2, reaper.get_action_context())
+scr.path, scr.secID, scr.cmdID = select(2, reaper.get_action_context())
 scr.dir = scr.path:match(".+[\\/]")
 scr.no_ext = scr.path:match("(.+)%.")
 scr.config = scr.no_ext .. "_cfg"
@@ -85,6 +92,8 @@ end
 
 if reaper.GetExtState("Quick Adder", "MSG") ~= "1" then
   reaper.SetExtState("Quick Adder", "MSG", 1, false)
+  reaper.SetToggleCommandState(scr.secID, scr.cmdID, 1)
+  reaper.RefreshToolbar2(scr.secID, scr.cmdID)
 else
   reaper.SetExtState("Quick Adder", "MSG", "reopen", false)
   return
@@ -132,9 +141,9 @@ function parseKeyVal(key)
 end
 
 if rpr.x64 then
-  rpr.vst = rpr.path .. "/reaper-vstplugins64.ini"
+  rpr.vst = rpr.path .. (os_is.mac_arm and "/reaper-vstplugins_arm64.ini" or "/reaper-vstplugins64.ini")
   if os_is.mac then
-    rpr.au = rpr.path .. "/reaper-auplugins64.ini"
+    rpr.au = rpr.path .. (os_is.mac_arm and "/reaper-auplugins_arm64.ini" or "/reaper-auplugins64.ini")
   end
 else
   rpr.vst = rpr.path .. "/reaper-vstplugins.ini"
@@ -635,6 +644,11 @@ if config.os ~= cur_os then
   end
 end
 
+if os_is.mac and not global_types.AU then
+  config.global_types_n = not global_types.AU and config.global_types_n + 1 or config.global_types_n
+  global_types.AU = true
+end
+
 if not config.version or config.version ~= scr.version then
   if not reaper.CF_EnumerateActions or
      not reaper.JS_Mouse_LoadCursor then
@@ -725,6 +739,12 @@ local retinaDivide = function(val)
   return math.floor(val)
 end
 
+function getResolutionKey(res_multi)
+  for k, v in pairs(res_multi) do
+    if v == config.multi then return k end
+  end
+end
+
 function exit_states()
   if scr.quit then return end
   
@@ -750,6 +770,8 @@ function exit_states()
   writeFile(scr.config, tableToString("filter_modes", filter_modes), "a")
   writeFile(scr.config, tableToString("keep_states", keep_states), "a")
   writeFile(scr.fav, tableToString("FAV", db.FAV))
+  reaper.SetToggleCommandState(scr.secID, scr.cmdID, 0)
+  reaper.RefreshToolbar2(scr.secID, scr.cmdID)
   reaper.DeleteExtState("Quick Adder", "MSG", false)
 end
 
@@ -2715,18 +2737,18 @@ function gui:setCursor()
   if gui.m_cap&mouse_mod.lmb == mouse_mod.lmb then return end
   if self.id and self.id:match("dragV") then
     if gui.m_cursor ~= "ns_arrow" then
-      gfx.setcursor(32645) -- North-South arrow
+      gui.m_cursor_n = 32645
       gui.m_cursor = "ns_arrow"
     end
   elseif gui.m_cursor == "ns_arrow" or
          self.cursor == "arrow" then
     if gui.m_cursor ~= "arrow" then
-      gfx.setcursor(32512) -- arrow
+      gui.m_cursor_n = 32512
       gui.m_cursor = "arrow"
     end
   elseif self.id and self.txt_field then
-    if gui.m_cursor ~= "i_beam" then
-      gfx.setcursor(32513) -- I-beam
+    if gui.m_cursor ~= "i_beam" and not gui.dd_items then
+      gui.m_cursor_n = 32513
       gui.m_cursor = "i_beam"
     end
   end
@@ -2919,7 +2941,7 @@ function gui:drawDdMenu(fill, label, parent)
   if parent and self.numbered and gui.dd_items and gui.dd_items[1].table == self.table then
     self.txt_align = gui.txt_align["right"]
     local num = self.id:match("dd_(%d+).+")
-    self:drawTxt("|" .. num, self.pad_x)
+    self:drawTxt("|" .. num, self.pad_x*config.multi)
     self.txt_align = gui.txt_align["vert"]
   elseif parent then
     self.txt_align = gui.txt_align["right"]
@@ -4479,7 +4501,7 @@ gui.hints.generate = function(id)
     elseif scr.query_parts and #scr.query_parts > 0 then
       gui.hints_txt =  #scr.results_list .. " matches found"
     elseif gui.over ~= "view_main" then
-      gui.hints_txt = "Press F1 for the help file"
+      gui.hints_txt = "Press F1 for help file"
     end
   else
     if not gui.dd_items then
@@ -5909,31 +5931,25 @@ end
 
 function getMobj()
   local setCursor = function(num, name)
-    local cur = reaper.JS_Mouse_LoadCursor(num)
-    reaper.JS_Mouse_SetCursor(cur)
-    gui.m_cursor = "name"
+    gui.m_cursor_n = num
+    gui.m_cursor = name
   end
   
   if gui.m_cap&mouse_mod.lmb == 1 and gui.m_cap ~= 25 and
      gui.active and gui.active.id:match("^result") and
      #scr.results_list > 0 and not scr.results_list[gui.Results.sel]:match("^ACTION") then
     if gui.m_x_click ~= gui.m_x or gui.m_y_click ~= gui.m_y then
-      if reaper.JS_Mouse_LoadCursor then
-        if m_obj then 
-          if gui.m_cursor ~= "dragdrop" and
-             gui.m_cap ~= mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
-             setCursor(182, "dragdrop")
-          elseif gui.m_cursor ~= "dragdropsend" and
-                 gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
-            setCursor(1011, "dragdropsend")
-            local cur = reaper.JS_Mouse_LoadCursor(1011)
-            reaper.JS_Mouse_SetCursor(cur)
-            gui.m_cursor = "dragdropsend"  
-          end
-        else
-          if gui.m_cursor ~= "cantdrop" then
-            setCursor(32648, "cantdrop")
-          end
+      if m_obj then 
+        if gui.m_cursor ~= "dragdrop" and
+           gui.m_cap ~= mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+           setCursor(182, "dragdrop")
+        elseif gui.m_cursor ~= "dragdropsend" and
+               gui.m_cap == mouse_mod.dds + (gfx.mouse_cap&mouse_mod.lmb) then
+          setCursor(1011, "dragdropsend")
+        end
+      else
+        if gui.m_cursor ~= "cantdrop" then
+          setCursor(32648, "cantdrop")
         end
       end
     end
@@ -6159,6 +6175,21 @@ function main()
     gui.reinit = true
     gui.wnd_h_save = gui.wnd_h
   end
+  
+  if gui.ext_retina_last and gui.ext_retina_last ~= gfx.ext_retina then
+    local ret1 = gui.ext_retina_last
+    local ret2 = gfx.ext_retina
+    if ret1 > ret2 then -- if not retina
+      config.retina = nil
+      scr.actions.resSet(getResolutionKey(res_multi), -1)
+    else
+      config.retina = true
+      scr.actions.resSet(getResolutionKey(res_multi), 1)
+    end
+    gui:resetDd()
+    gui.ret_to_std = true
+    gui.reinit = true
+  end
    
   gui.bg_hue = config.theme == "light" and 50 or 30
   gui.accent_c = config.theme == "light" and 130 or 40
@@ -6189,6 +6220,8 @@ function main()
     mainView()
   end
   prefsView()
+  
+  gfx.setcursor(gui.m_cursor_n, gui.m_cursor)
   
   if gui.clicked and not gui.click_ignore then
     if gui.clicked.m_cap&1 == 1 then -- if left mouse click
@@ -6224,7 +6257,7 @@ function main()
       scr.re_search = nil
       match_stop = nil
     elseif config.fav_persist and config.results_max > 0 and db[global_types_order[#global_types_order]] and
-           (gui.str == "" and #scr.results_list == 0 and #db.FAV > 0 or scr.re_search) then
+           (gui.str == "" and #scr.results_list == 0 or scr.re_search) then
 
       
       if not scr.fav_reorder then
@@ -6265,7 +6298,9 @@ function main()
     else
       reaper.atexit(exit_states)
     end
-  end  
+  end
+  
+  gui.ext_retina_last = gfx.ext_retina
 
   if double_clicked then
     double_clicked = nil
