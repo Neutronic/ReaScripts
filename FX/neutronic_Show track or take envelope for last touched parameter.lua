@@ -1,20 +1,22 @@
 --[[
 Description: Show track or take envelope for last touched parameter
-About: Adds tracks or takes envelopes for the last touched FX parameter.
-Version: 1.02
+About: Adds tracks or takes envelopes for the last touched FX parameter
+Version: 1.03
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
 Links:
   Neutronic's REAPER forum profile https://forum.cockos.com/member.php?u=66313
 Changelog:
-  # check if touched parameter exists
+  # change ai_insert default to false
+  # reliably update arrange when ai_insert is false
+  # fix creating undo points in some cases
 --]]
 
 ---------- USER DEFINABLES ----------
 
 local toggle = true -- if true then then the script toggles envelope visibility
-local ai_insert = true -- if true then an automation item is inserted on the envelope
+local ai_insert = false -- if true then an automation item is inserted on the envelope
 
 -------------------------------------
 
@@ -66,14 +68,15 @@ function track_fx(track, paramnumber, fx_number)
     elseif vis == "0" then -- if env is not visible
       reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%11"), false)
     end
-  else 
+  else
+    reaper.Undo_BeginBlock()
     env = reaper.GetFXEnvelope(track, fx_number, paramnumber, true)
+
     if tracknumber > 0 and env and ai_insert then -- if not master and ai_insert is on
-      reaper.Undo_BeginBlock()
       reaper.Main_OnCommand(41163, 0) -- unarm all envelopes
       create_ai(track, env)
     else
-      return
+      reaper.SetEnvelopePoint(env, 0) -- ensures undo point
     end
   end
   
@@ -107,7 +110,8 @@ function take_fx(track, item, tk_number, paramnumber, fx_number)
         reaper.SetEnvelopeStateChunk(env, env_chunk:gsub("(VIS )%d", "%11"), false)
       end
     else
-      reaper.TakeFX_GetEnvelope(tk, fx_number, paramnumber, true)
+      local env = reaper.TakeFX_GetEnvelope(tk, fx_number, paramnumber, true)
+      reaper.SetEnvelopePoint(env, 0) -- ensures undo point
     end
     reaper.UpdateArrange()
   undo_close(param_name, fx_name)
