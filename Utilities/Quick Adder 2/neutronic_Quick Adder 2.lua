@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Unified solution for adding FX, inserting track templates and running actions in REAPER.
-Version: 2.47
+Version: 2.49
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,13 +10,11 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + support native Apple silicon REAPER builds (macOS-ARM)
-  + macOS-ARM: use correct font sizes
-  + macOS-ARM: scan relevant VST and AU ini files
-  + report QA2 state to REAPER action list and toolbars
-  + auto-adjust GUI size when moving it from non-retina to retina screen and vice versa
-  # fix showing results on QA2 launch (when "List all ..." is enabled)
-  # fix mouse cursor flicker that occurred in some cases
+  + ability to control QA2 with external actions (downloaded separately)
+  + post scanning status to REAPER info bar when siliently refreshing database
+  # improve QA2 tab naming when docked
+  # fix QA2 crash when scrolling zero results list
+  # macOS: improve automatic GUI positioning
 --]]
 
 local rpr = {}
@@ -82,6 +80,7 @@ scr.plugs = scr.no_ext .. "_db"
 findContentKey(getContent(scr.path), "", true)
 scr.name = "Quick Adder v" .. scr.version .. "  |  Neutronic"
 scr.actions = {}
+scr.ext_refresh = reaper.GetExtState("Quick Adder", "ACT") ~= "" and true or nil
 
 rpr.ver = tonumber(reaper.GetAppVersion():match("[%d%.]+"))
 
@@ -90,8 +89,11 @@ if rpr.ver < 5.985 then
   return
 end
 
-if reaper.GetExtState("Quick Adder", "MSG") ~= "1" then
-  reaper.SetExtState("Quick Adder", "MSG", 1, false)
+if reaper.GetExtState("Quick Adder", "MSG") == "2" then
+  return
+elseif reaper.GetExtState("Quick Adder", "MSG") ~= "1" then
+  local msg = scr.ext_refresh and 2 or 1
+  reaper.SetExtState("Quick Adder", "MSG", msg, false)
   reaper.SetToggleCommandState(scr.secID, scr.cmdID, 1)
   reaper.RefreshToolbar2(scr.secID, scr.cmdID)
 else
@@ -244,9 +246,18 @@ function macYoffset(cur_h, new_h, y)
   if not cur_h then return y end
   if os_is.mac then
     y = y + cur_h - new_h
-  else
-    y = y
+    
+    local gui_x, gui_y, gui_w, gui_h = select(2, gfx.dock(-1, 0, 0, 0, 0))
+    local scr_l, scr_t, scr_r, scr_b = reaper.my_getViewport(0, 0, 0, 0, gui_x, gui_y, gui_x, gui_y, true)
+ 
+    if y + new_h >= scr_b then
+      y = scr_b - new_h <= scr_t and scr_t or scr_b - new_h-- + scr_t
+    elseif y < 0 then
+      local scr_l, scr_t, scr_r, scr_b = reaper.my_getViewport(0, 0, 0, 0, gui_x, gui_y+new_h, gui_x+gui_w, gui_y+new_h, true)
+      y = scr_t
+    end
   end
+
   return y
 end
 
@@ -750,6 +761,9 @@ function exit_states()
   
   scr.quit = true
   local _, wnd_x, wnd_y, _, h = gfx.dock(-1, 0, 0, 0, 0)
+  
+  if not gui.open then goto SKIP end
+  
   wnd_y = macYoffset(retinaDivide(scr.temp_undock and os_is.mac and gui.wnd_h_save or gui.wnd_h),
                      retinaDivide((config.ext_check or scr.temp_undock and os_is.mac) and gui.wnd_h or 
                      gui.Row1.h + gui.row_h + gui.border * 2),
@@ -761,9 +775,11 @@ function exit_states()
   if config.default_mode then config.mode = config.default_mode end
   
   if scr.temp_undock then config.undock = false end
+
+  ::SKIP::
   
   if get_db_txt then os.remove(scr.plugs) end
-  
+ 
   writeFile(scr.config, tableToString("config", config))
   writeFile(scr.config, tableToString("global_types", global_types), "a")
   writeFile(scr.config, tableToString("global_types_order", global_types_order), "a")
@@ -773,6 +789,7 @@ function exit_states()
   reaper.SetToggleCommandState(scr.secID, scr.cmdID, 0)
   reaper.RefreshToolbar2(scr.secID, scr.cmdID)
   reaper.DeleteExtState("Quick Adder", "MSG", false)
+  reaper.DeleteExtState("Quick Adder", "ACT", false)
 end
 
 local m_track = reaper.GetMasterTrack()
@@ -894,158 +911,169 @@ end
 function getDb(refresh)
   if not db.saved then
     function dbDefer()
-        if gui.ch == -1 then return end
+      if gui.ch == -1 then return end
+      
+      get_db = true
+      if config.fol_search and not fx_folders then
+        local fx_folders_ini = getContent(rpr.fx_folders)
         
-        get_db = true
-        if config.fol_search then
-          local fx_folders_ini = getContent(rpr.fx_folders)
-          
-          if fx_folders_ini then
-            fx_folders_ini = fx_folders_ini .. "\n\n"
-            local folder_names = fx_folders_ini:match("%[Folders%](.-)\n[\n%[]")
-            if folder_names then
-              fx_folders = {}
-              for match in folder_names:gmatch("Name%d+=.-\n") do
-                local n, name = match:match("Name(%d+)=(.+)\n")
-                fx_folders[n+1] = {name = name}
-              end
-              
+        if fx_folders_ini then
+          fx_folders_ini = fx_folders_ini .. "\n\n"
+          local folder_names = fx_folders_ini:match("%[Folders%](.-)\n[\n%[]")
+          if folder_names then
+            fx_folders = {}
+            for match in folder_names:gmatch("Name%d+=.-\n") do
+              local n, name = match:match("Name(%d+)=(.+)\n")
+              fx_folders[n+1] = {name = name}
+            end
             
-              for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
-                local n, content = match:match("Folder(%d+)%](.+)")
-                fx_folders[n+1].content = content:gsub("[^%w%.\n\r]", "_"):lower()
-              end
-              fx_folders_ini = nil
+          
+            for match in fx_folders_ini:gmatch("(Folder%d+%].-)\n[\n%[]") do
+              local n, content = match:match("Folder(%d+)%](.+)")
+              fx_folders[n+1].content = content:gsub("[^%w%.\n\r]", "_"):lower()
             end
+            fx_folders_ini = nil
           end
         end
-
-        local r_ini = getContent(reaper.get_ini_file())
-        --[[rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
-        fx_dir_list = getFxDir(rpr.vstpath)
-        fx_file_list = listArrayDirFiles(fx_dir_list)]]
-        --rpr.aupath = os_is.mac and {"Library/Audio/Plug-Ins/Components",
-        --              "~/Library/Audio/Plug-Ins/Components"} or nil
-        --au_dir_list = os_is.mac and getFxDir(rpr.aupath) or nil
-        --au_file_list = os_is.mac and listArrayDirFiles(au_dir_list) or nil
-        --fx_dir_list = nil
-        --fx_file_list = nil
-                                  
-        rpr.def_fx_filt = parseIniFxFilt(findContentKey(r_ini,
-                          rpr.x64 and (os_is.win and "def_fx_filt64" or "def_fx_filtx64") or
-                          os_is.win and "def_fx_filt32" or "def_fx_filtx32"))
-        r_ini = nil
-        if not db.VST2 then
-          if not coVst then coVst = coroutine.create(getVst) end
-          local n = select(2, coroutine.resume(coVst))
-          get_db_txt = "Scanning VST: " .. (n or #db.VST2 + #db.VST3)
-        elseif not db.JS then
-          if not coJs then coJs = coroutine.create(getJs) end
-          local n = select(2, coroutine.resume(coJs))
-          get_db_txt = "Scanning JS: " .. (n or #db.JS)
-        elseif os_is.mac and not db.AU then
-          if not coAu then coAu = coroutine.create(getAu) end
-          local n = select(2, coroutine.resume(coAu))
-          get_db_txt = "Scanning AU: " .. (n or #db.AU)    
-        elseif not db.CHAIN then
-          if not coChain then coChain = coroutine.create(getFiles) end
-          local n = select(2, coroutine.resume(coChain, "FXChains", "RfxChain"))
-          get_db_txt = "Scanning FX chains: " .. (n or #db.CHAIN)
-        elseif not db.TEMPLATE then
-          if not coTemplate then coTemplate = coroutine.create(getFiles) end
-          local n = select(2, coroutine.resume(coTemplate, "TrackTemplates", "RTrackTemplate"))
-          get_db_txt = "Scanning track templates: " .. (n or #db.TEMPLATE)
-        elseif config.act_search and not db.ACTION then
-          if not coAction then coAction = coroutine.create(getAction) end
-          local n = select(2, coroutine.resume(coAction))
-          get_db_txt = "Scanning Actions: " .. (n or 65535)
+      end
+  
+      local r_ini = getContent(reaper.get_ini_file())
+      --[[rpr.vstpath = parseKeyVal(findContentKey(r_ini, rpr.x64 and "vstpath64" or "vstpath"))
+      fx_dir_list = getFxDir(rpr.vstpath)
+      fx_file_list = listArrayDirFiles(fx_dir_list)]]
+      --rpr.aupath = os_is.mac and {"Library/Audio/Plug-Ins/Components",
+      --              "~/Library/Audio/Plug-Ins/Components"} or nil
+      --au_dir_list = os_is.mac and getFxDir(rpr.aupath) or nil
+      --au_file_list = os_is.mac and listArrayDirFiles(au_dir_list) or nil
+      --fx_dir_list = nil
+      --fx_file_list = nil
+                                
+      rpr.def_fx_filt = parseIniFxFilt(findContentKey(r_ini,
+                        rpr.x64 and (os_is.win and "def_fx_filt64" or "def_fx_filtx64") or
+                        os_is.win and "def_fx_filt32" or "def_fx_filtx32"))
+      r_ini = nil
+      if not db.VST2 then
+        if not coVst then coVst = coroutine.create(getVst) end
+        local n = select(2, coroutine.resume(coVst))
+        get_db_txt = "Scanning VST: " .. (n or #db.VST2 + #db.VST3)
+      elseif not db.JS then
+        if not coJs then coJs = coroutine.create(getJs) end
+        local n = select(2, coroutine.resume(coJs))
+        get_db_txt = "Scanning JS: " .. (n or #db.JS)
+      elseif os_is.mac and not db.AU then
+        if not coAu then coAu = coroutine.create(getAu) end
+        local n = select(2, coroutine.resume(coAu))
+        get_db_txt = "Scanning AU: " .. (n or #db.AU)    
+      elseif not db.CHAIN then
+        if not coChain then coChain = coroutine.create(getFiles) end
+        local n = select(2, coroutine.resume(coChain, "FXChains", "RfxChain"))
+        get_db_txt = "Scanning FX chains: " .. (n or #db.CHAIN)
+      elseif not db.TEMPLATE then
+        if not coTemplate then coTemplate = coroutine.create(getFiles) end
+        local n = select(2, coroutine.resume(coTemplate, "TrackTemplates", "RTrackTemplate"))
+        get_db_txt = "Scanning track templates: " .. (n or #db.TEMPLATE)
+      elseif config.act_search and not db.ACTION then
+        if not coAction then coAction = coroutine.create(getAction) end
+        local n = select(2, coroutine.resume(coAction))
+        get_db_txt = "Scanning Actions: " .. (n or 65535)
+      end
+      
+      if not db.VST2 or not db.JS or not db.CHAIN or not db.TEMPLATE or
+         (config.act_search and not db.ACTION) or (os_is.mac and not db.AU) then
+        reaper.defer(dbDefer)
+      else
+        if not scr.db_total then
+          scr.db_total = #db.VST2 + #db.VST3 + #db.JS + #db.CHAIN + #db.TEMPLATE +
+                         (db.ACTION and #db.ACTION or 0) + (db.AU and #db.AU or 0)
+        end 
+        
+        if not coVst2 or coroutine.status(coVst2) == "suspended" then
+          if not coVst2 then coVst2 = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coVst2, "VST2", db.VST2, true))
+          --get_db_txt = "Saving VST2 database"
+          get_db_txt = "Finalizing database (" .. scr.db_total .. " entries)"
+          scr.re_search = true
+          if coroutine.status(coVst2) == "dead" then
+            writeFile(scr.plugs, str)
+          end
+        elseif not coVst3 or coroutine.status(coVst3) == "suspended" then
+          if not coVst3 then coVst3 = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coVst3, "VST3", db.VST3, true))
+          --get_db_txt = "Saving VST3 database"
+          if coroutine.status(coVst3) == "dead" then
+            writeFile(scr.plugs, str, "a")
+          end
+        elseif not coJs or coroutine.status(coJs) == "suspended" then
+          if not coJs then coJs = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coJs, "JS", db.JS, true))
+          --get_db_txt = "Saving JS database"
+          if coroutine.status(coJs) == "dead" then
+            writeFile(scr.plugs, str, "a")
+          end
+        elseif os_is.mac and (not coAu or coroutine.status(coAu) == "suspended") then
+          if not coAu then coAu = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coAu, "AU", db.AU, true))
+          --get_db_txt = "Saving JS database"
+          if coroutine.status(coAu) == "dead" then
+            writeFile(scr.plugs, str, "a")
+          end  
+        elseif not coChain or coroutine.status(coChain) == "suspended" then
+          if not coChain then coChain = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coChain, "CHAIN", db.CHAIN, true))
+          --get_db_txt = "Saving chains database"
+          if coroutine.status(coChain) == "dead" then
+            writeFile(scr.plugs, str, "a")
+          end
+        elseif not coTemplate or coroutine.status(coTemplate) == "suspended" then
+          if not coTemplate then coTemplate = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coTemplate, "TEMPLATE", db.TEMPLATE, true))
+          --get_db_txt = "Saving templates database"
+          if coroutine.status(coTemplate) == "dead" then
+            writeFile(scr.plugs, str, "a")
+          end
+        elseif not coAction or coroutine.status(coAction) == "suspended" then
+          if not coAction then coAction = coroutine.create(tableToString) end
+          local str = select(2, coroutine.resume(coAction, "ACTION", db.ACTION, true))
+          --get_db_txt = "Saving actions database"
+          if coroutine.status(coAction) == "dead" then
+            if config.act_search then writeFile(scr.plugs, str, "a") end
+            
+            if reaper.GetExtState("Quick Adder", "ACT") == "refresh" then
+              reaper.DeleteExtState("Quick Adder", "ACT", false)
+              if reaper.GetExtState("Quick Adder", "MSG") == "2" then scr.over = true end
+            end
+            
+            get_db_txt = nil
+            get_db = nil
+            coVst2 = nil
+            coVst3 = nil
+            coJs = nil
+            coAu = nil
+            coChain = nil
+            coTemplate = nil
+            coAction = nil
+            fx_folders = nil
+            scr.ellipsis = nil
+            timers.ellipsis = nil
+            if refresh then
+              gui.wnd_h_save = gui.wnd_h
+              gui.reinit = true
+              scr.re_search = true
+            end
+          end  
         end
- 
-        if not db.VST2 or not db.JS or not db.CHAIN or not db.TEMPLATE or
-           (config.act_search and not db.ACTION) or (os_is.mac and not db.AU) then
+        
+        if coVst2 or coVst3 or coJs or coChain or coTemplate or coAction then
           reaper.defer(dbDefer)
-        else
-          get_db = nil
-          
-          if not scr.db_total then
-            scr.db_total = #db.VST2 + #db.VST3 + #db.JS + #db.CHAIN + #db.TEMPLATE +
-                           (db.ACTION and #db.ACTION or 0) + (db.AU and #db.AU or 0)
-          end 
-          
-          if not coVst2 or coroutine.status(coVst2) == "suspended" then
-            if not coVst2 then coVst2 = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coVst2, "VST2", db.VST2, true))
-            --get_db_txt = "Saving VST2 database"
-            get_db_txt = "Finalizing database (" .. scr.db_total .. " entries)"
-            scr.re_search = true
-            if coroutine.status(coVst2) == "dead" then
-              writeFile(scr.plugs, str)
-            end
-          elseif not coVst3 or coroutine.status(coVst3) == "suspended" then
-            if not coVst3 then coVst3 = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coVst3, "VST3", db.VST3, true))
-            --get_db_txt = "Saving VST3 database"
-            if coroutine.status(coVst3) == "dead" then
-              writeFile(scr.plugs, str, "a")
-            end
-          elseif not coJs or coroutine.status(coJs) == "suspended" then
-            if not coJs then coJs = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coJs, "JS", db.JS, true))
-            --get_db_txt = "Saving JS database"
-            if coroutine.status(coJs) == "dead" then
-              writeFile(scr.plugs, str, "a")
-            end
-          elseif os_is.mac and (not coAu or coroutine.status(coAu) == "suspended") then
-            if not coAu then coAu = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coAu, "AU", db.AU, true))
-            --get_db_txt = "Saving JS database"
-            if coroutine.status(coAu) == "dead" then
-              writeFile(scr.plugs, str, "a")
-            end  
-          elseif not coChain or coroutine.status(coChain) == "suspended" then
-            if not coChain then coChain = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coChain, "CHAIN", db.CHAIN, true))
-            --get_db_txt = "Saving chains database"
-            if coroutine.status(coChain) == "dead" then
-              writeFile(scr.plugs, str, "a")
-            end
-          elseif not coTemplate or coroutine.status(coTemplate) == "suspended" then
-            if not coTemplate then coTemplate = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coTemplate, "TEMPLATE", db.TEMPLATE, true))
-            --get_db_txt = "Saving templates database"
-            if coroutine.status(coTemplate) == "dead" then
-              writeFile(scr.plugs, str, "a")
-            end
-          elseif not coAction or coroutine.status(coAction) == "suspended" then
-            if not coAction then coAction = coroutine.create(tableToString) end
-            local str = select(2, coroutine.resume(coAction, "ACTION", db.ACTION, true))
-            --get_db_txt = "Saving actions database"
-            if coroutine.status(coAction) == "dead" then
-              if config.act_search then writeFile(scr.plugs, str, "a") end
-              get_db_txt = nil
-              coVst2 = nil
-              coVst3 = nil
-              coJs = nil
-              coAu = nil
-              coChain = nil
-              coTemplate = nil
-              coAction = nil
-              fx_folders = nil
-              scr.ellipsis = nil
-              timers.ellipsis = nil
-              if refresh then
-                gui.wnd_h_save = gui.wnd_h
-                gui.reinit = true
-                scr.re_search = true
-              end
-            end  
-          end
-
-          if coVst2 or coVst3 or coJs or coChain or coTemplate or coAction then
-            reaper.defer(dbDefer)
-          end
         end
-      end  
+      end
+      
+      if reaper.GetExtState("Quick Adder", "MSG") == "2" and get_db_txt then
+        get_db_txt = get_db_txt:gsub("^.", string.lower)
+        reaper.Help_Set("Quick Adder: " .. get_db_txt, 1)
+      end
+    end
+    
     dbDefer()
   else
     db.VST2 = VST2
@@ -1118,6 +1146,7 @@ function doAdd()
           match("(.+)/.+")
     local id = select(6, gui.parseResult(scr.results_list[gui.Results.sel]))
     if section == "Main" then
+      a = id
       reaper.Main_OnCommand(id, 0)
       scr.result_is_action = true
     elseif section == "MIDI Editor" or section == "MIDI Event List Editor" then
@@ -1588,6 +1617,7 @@ function getVst()
     table.insert(sub_tbl, val)
     ::SKIP::
   end
+  
   db.VST2 = tblVST2
   db.VST3 = tblVST3
   db.VST3 = sortAbc(db.VST3)
@@ -2192,7 +2222,7 @@ Additional keyboard shortcuts:
   While Search Filter Tray is open:
     N: set the search filter to ACT (actions);
     A: set the search filter to ALL (global search);
-]]..(os_is.win and "    U: set the search filter to AU;\n" or "")..[[
+]]..(os_is.mac and "    U: set the search filter to AU;\n" or "")..[[
     C: set the search filter to CH (FX chains);
     F: set the search filter to FAV (favorites);
     O: set the search filter to FOL (FX browser folders);
@@ -2389,14 +2419,16 @@ function gui:init()
     end
   end
   
+  local dock = not config.undock and config.dock and config.dock or 0
+  
+  local name = dock == 0 and scr.name or "Quick Adder"
+  
   local refocus = function()
     if gfx.getchar(65536)&2 ~= 2 and reaper.JS_Window_SetFocus then
-      local wnd = reaper.JS_Window_Find(scr.name, true)
+      local wnd = reaper.JS_Window_Find(name, true)
       reaper.JS_Window_SetFocus(wnd)
     end
   end
-  
-  local dock = not config.undock and config.dock and config.dock or 0
 
   if not gui.open then
     if not config.undock then scr.main_w_rs = gui.wnd_w end
@@ -2406,18 +2438,18 @@ function gui:init()
     gui.open = true
     gfx.ext_retina = 1
     local init_retina = config.retina
-    gfx.init(scr.name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     isRetina(gfx.ext_retina)
     
     if not init_retina and config.retina then -- reopen if first time retina
       gfx.quit()
-      gfx.init(scr.name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+      gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     end
     
     refocus()
     
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
-      local wnd = reaper.JS_Window_Find(scr.name, true)
+      local wnd = reaper.JS_Window_Find(name, true)
       reaper.JS_Window_AttachTopmostPin(wnd)
     end
   end
@@ -2450,13 +2482,13 @@ function gui:init()
     end
     if gfx.dock(-1)&1 == 0 or config.undock or gfx.getchar(65536)&4 ~= 4 then
       gfx.quit()
-      gfx.init(scr.name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h),dock, wnd_x, wnd_y)
+      gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h),dock, wnd_x, wnd_y)
     end
     
     refocus()
     
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
-      reaper.JS_Window_AttachTopmostPin(reaper.JS_Window_Find(scr.name, true))
+      reaper.JS_Window_AttachTopmostPin(reaper.JS_Window_Find(name, true))
     end
   end
 end
@@ -4252,13 +4284,13 @@ scr.actions.scrollbar = function(o)
   gui.Scrollbar:hover()
 end
 
-scr.actions.resSet = function(name, kb)
+scr.actions.resSet = function(name, kb, skip_init)
   local setW = function()
     config.main_w_rs = nil
     gui.wnd_w = gui.view == "main" and getMainW() or getPrefsW()
     gui.w = gui.wnd_w - gui.border * (config.undock and 2 or 5)
     gui.wnd_h_save = gui.wnd_h
-    gui.reinit = true
+    if not skip_init then gui.reinit = true end
     scr.refresh_results_max = true
   end
   
@@ -5259,7 +5291,7 @@ function a_scrollwheel()end
 
     ::SKIP::
     
-    if not config.undock and gfx.mouse_wheel < 0 and #scr.results_list and
+    if not config.undock and gfx.mouse_wheel < 0 and #scr.results_list > 0 and
        gui.list_start_offset + #gui.Results == #scr.results_list and gui.Results[#gui.Results].y2 > gfx.h then
       gui.list_start_offset = gui.list_start_offset + 1
     end
@@ -5457,6 +5489,7 @@ gui.prefs_page = function(page)
       gui.Prefs.Body.Section_1:setStyle("dd")
       local i = gui.Prefs.dd_num
       local name
+      
       for k, v in pairs(res_multi) do
         if v == config.multi then
           name = k
@@ -5923,7 +5956,7 @@ function prefsView()
   gui.Prefs.Body.font = 13
   gui.Prefs.Body:setStyle("search")
   
-  gui.hints.generate(gui.over)
+  pcall(gui.hints.generate, gui.over)
   
   gui.prefs_page(gui.page)
   gui:init()
@@ -6152,7 +6185,16 @@ end
 
 function a_main()end
 function main()
- if reaper.GetExtState("Quick Adder", "MSG") == "reopen" then
+  local act = reaper.GetExtState("Quick Adder", "ACT")
+  scr.ext_refresh = act == "refresh" and true or nil
+  
+  if act:match("^|") then
+    scr.actions.resSet(act, {})
+    reaper.DeleteExtState("Quick Adder", "ACT", false)
+    if reaper.GetExtState("Quick Adder", "MSG") == "2" then scr.over = true end
+  end
+
+  if reaper.GetExtState("Quick Adder", "MSG") == "reopen" then
     reaper.SetExtState("Quick Adder", "MSG", 1, false)
     gui.reopen = true
   end
@@ -6176,19 +6218,19 @@ function main()
     gui.wnd_h_save = gui.wnd_h
   end
   
-  if gui.ext_retina_last and gui.ext_retina_last ~= gfx.ext_retina then
+  if gui.open and gui.ext_retina_last and gui.ext_retina_last ~= gfx.ext_retina then
     local ret1 = gui.ext_retina_last
     local ret2 = gfx.ext_retina
     if ret1 > ret2 then -- if not retina
       config.retina = nil
-      scr.actions.resSet(getResolutionKey(res_multi), -1)
+      scr.actions.resSet(getResolutionKey(res_multi), -1, true)
     else
       config.retina = true
-      scr.actions.resSet(getResolutionKey(res_multi), 1)
+      scr.actions.resSet(getResolutionKey(res_multi), 1, true)
     end
     gui:resetDd()
     gui.ret_to_std = true
-    gui.reinit = true
+    --gui.reinit = true
   end
    
   gui.bg_hue = config.theme == "light" and 50 or 30
@@ -6216,10 +6258,10 @@ function main()
   
   if config.ext_check then
     getExt()
-  else
+  elseif reaper.GetExtState("Quick Adder", "MSG") ~= "2" then
     mainView()
+    prefsView()
   end
-  prefsView()
   
   gfx.setcursor(gui.m_cursor_n, gui.m_cursor)
   
@@ -6240,7 +6282,12 @@ function main()
     pcall(scr.actions[gui.focused.id:gsub("%p%d", ""):gsub("(.-)_.+", "%1")], gui.focused, true)
   end
   
-  if not config.ext_check then kbActions() end
+  if not config.ext_check then
+    kbActions()
+    if scr.ext_refresh and not get_db_txt then
+      scr.actions.refreshDb()
+    end
+  end
 
   if not gui.search_suspend or gui.search_suspend and gui.str == "" then-- and gui.str:len() > 1 then
     if gui.str ~= "" and (scr.re_search or
@@ -6309,7 +6356,7 @@ function main()
     double_clicked_id = nil
   end
 
-  if gui.ch == -1 then
+  if gui.ch == -1 and not scr.ext_refresh then
     if scr.temp_undock then
       scr.temp_undock = nil
       config.undock = false
@@ -6329,6 +6376,6 @@ end
 
 main()
 
-getDb()
+if not get_db then getDb() end
 
 reaper.atexit(exit_states)
