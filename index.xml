@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="32d6cc09fff9a559affabf281c4fb430edb6d69d">
+<index version="1" name="Neutronic Scripts" commit="1747a6c3698e3bb44e3cf0bd8a1cd6bfa2e0df68">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -557,6 +557,130 @@ sends selected tracks (or track under mouse) to it
 # fix showing results on QA2 launch (when "List all ..." is enabled)
 # fix mouse cursor flicker that occurred in some cases]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/a54d4e2856c2179fed96f729b4ff97151eb6ab99/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.49" author="Neutronic" time="2021-08-18T00:48:50Z">
+        <changelog><![CDATA[+ ability to control QA2 with external actions (downloaded separately)
++ post scanning status to REAPER info bar when siliently refreshing database
+# improve QA2 tab naming when docked
+# fix QA2 crash when scrolling zero results list
+# macOS: improve automatic GUI positioning]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/1747a6c3698e3bb44e3cf0bd8a1cd6bfa2e0df68/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Utilities/Quick Adder 2/Actions">
+    <reapack name="neutronic_Quick Adder 2 -- optimize GUI size for 1080p.lua" type="script" desc="Quick Adder 2 -- optimize GUI size for 1080p">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Optimizes Quick Adder 2 window size for 1080p screen resolution.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:16Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/cb1916c0b749b782e8c82892cbb0012f9ced5ce1/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20optimize%20GUI%20size%20for%201080p.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick Adder 2 -- optimize GUI size for 4k.lua" type="script" desc="Quick Adder 2 -- optimize GUI size for 4k">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Optimizes Quick Adder 2 window size for 4k screen resolution.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:22Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/b604cfcaebba9be58fe425771007738e63bc8748/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20optimize%20GUI%20size%20for%204k.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick Adder 2 -- optimize GUI size for 5k.lua" type="script" desc="Quick Adder 2 -- optimize GUI size for 5k">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Optimizes Quick Adder 2 window size for 5k screen resolution.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:28Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/7a9cad15d448b6a78f1ff6acf49d231fe94485b5/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20optimize%20GUI%20size%20for%205k.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick Adder 2 -- optimize GUI size for 720p.lua" type="script" desc="Quick Adder 2 -- optimize GUI size for 720p">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Optimizes Quick Adder 2 window size for 720p screen resolution.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:34Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/b18a5a66a647cc077135339d2a935b288d8255d5/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20optimize%20GUI%20size%20for%20720p.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick Adder 2 -- optimize GUI size for 8k.lua" type="script" desc="Quick Adder 2 -- optimize GUI size for 8k">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Optimizes Quick Adder 2 window size for 8k screen resolution.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:39Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/4d3e2ab52d49f966865c10453d76481f392c170b/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20optimize%20GUI%20size%20for%208k.lua</source>
+      </version>
+    </reapack>
+    <reapack name="neutronic_Quick Adder 2 -- refresh database.lua" type="script" desc="Quick Adder 2 -- refresh database">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Refreshes Quick Adder 2 database.\par}
+}
+]]></description>
+        <link rel="website" href="https://forum.cockos.com/member.php?u=66313">Neutronic's REAPER forum profile</link>
+        <link rel="website" href="https://forum.cockos.com/showthread.php?t=232928">Quick Adder 2 forum thread</link>
+        <link rel="website" href="http://bit.ly/seeQA2">Quick Adder 2 video demo</link>
+        <link rel="donation">https://paypal.me/SIXSTARCOS</link>
+      </metadata>
+      <version name="1.0" author="Neutronic" time="2021-08-18T00:48:44Z">
+        <changelog><![CDATA[+ initial release]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/94a0aea5da7e167fcab35fa9b8340f1723823b59/Utilities/Quick%20Adder%202/Actions/neutronic_Quick%20Adder%202%20--%20refresh%20database.lua</source>
       </version>
     </reapack>
   </category>
