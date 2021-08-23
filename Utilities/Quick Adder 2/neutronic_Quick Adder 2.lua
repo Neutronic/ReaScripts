@@ -244,15 +244,16 @@ end
 function a_macYoffset()end
 function macYoffset(cur_h, new_h, y)
   if not cur_h then return y end
+  
   if os_is.mac then
     y = y + cur_h - new_h
     
     local gui_x, gui_y, gui_w, gui_h = select(2, gfx.dock(-1, 0, 0, 0, 0))
     local scr_l, scr_t, scr_r, scr_b = reaper.my_getViewport(0, 0, 0, 0, gui_x, gui_y, gui_x, gui_y, true)
- 
+
     if y + new_h >= scr_b then
       y = scr_b - new_h <= scr_t and scr_t or scr_b - new_h-- + scr_t
-    elseif y < 0 then
+    elseif y < 0 and scr_b > 0 then
       local scr_l, scr_t, scr_r, scr_b = reaper.my_getViewport(0, 0, 0, 0, gui_x, gui_y+new_h, gui_x+gui_w, gui_y+new_h, true)
       y = scr_t
     end
@@ -744,7 +745,7 @@ function truncateString(x1, x2, str, str_w, offset)
   return str
 end
 
-local retinaDivide = function(val)
+function retinaDivide(val)
   if not val then return end
   val = config.retina and val / 2 or val
   return math.floor(val)
@@ -2392,8 +2393,11 @@ initFonts()
 function macAdjustGfxH()
   if config.retina then return end
   
-  gui.wnd_h = os_is.mac and (gui.wnd_h <= scr.vp_h and gui.wnd_h or scr.vp_h) or gui.wnd_h
-  gui.wnd_h_save = os_is.mac and (gui.wnd_h_save and (gui.wnd_h_save <= scr.vp_h and
+  local gui_x, gui_y, gui_w, gui_h = select(2, gfx.dock(-1, 0, 0, 0, 0))
+  scr.vp_w, scr.vp_h = select(3, reaper.my_getViewport(0, 0, 0, 0, gui_x, gui_y, gui_x, gui_y, true))
+
+  gui.wnd_h = os_is.mac and ((gui.wnd_h <= scr.vp_h or scr.vp_h < 0) and gui.wnd_h or scr.vp_h) or gui.wnd_h
+  gui.wnd_h_save = os_is.mac and (gui.wnd_h_save and ((gui.wnd_h_save <= scr.vp_h or scr.vp_h < 0) and
                                   gui.wnd_h_save or scr.vp_h) or gui.wnd_h) or gui.wnd_h
 end
 
@@ -2422,23 +2426,25 @@ function gui:init()
   local dock = not config.undock and config.dock and config.dock or 0
   
   local name = dock == 0 and scr.name or "Quick Adder"
+  scr.title_name = name
   
   local refocus = function()
-    if gfx.getchar(65536)&2 ~= 2 and reaper.JS_Window_SetFocus then
-      local wnd = reaper.JS_Window_Find(name, true)
-      reaper.JS_Window_SetFocus(wnd)
+    if scr.hwnd and gfx.getchar(65536)&2 ~= 2 and reaper.JS_Window_SetFocus then
+      reaper.JS_Window_SetFocus(scr.hwnd)
     end
   end
 
   if not gui.open then
     if not config.undock then scr.main_w_rs = gui.wnd_w end
-    scr.vp_w, scr.vp_h = getResolution(true)
+    scr.vp_w, scr.vp_h = getResolution(true) -- of main screen
     local wnd_x = config.wnd_x or (scr.vp_w - gui.wnd_w)/2 - 8
     local wnd_y = config.wnd_y or (os_is.win or os_is.lin and 200) or (scr.vp_h - gui.wnd_h)/2 + 150
     gui.open = true
     gfx.ext_retina = 1
     local init_retina = config.retina
+    
     gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    
     isRetina(gfx.ext_retina)
     
     if not init_retina and config.retina then -- reopen if first time retina
@@ -2446,50 +2452,50 @@ function gui:init()
       gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     end
     
-    refocus()
+    --refocus()
     
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
-      local wnd = reaper.JS_Window_Find(name, true)
-      reaper.JS_Window_AttachTopmostPin(wnd)
+      scr.hwnd = reaper.JS_Window_FindTop(name, true)
+      
+      if not scr.hwnd then
+        local address_cnt, address_list = reaper.JS_Window_ListFind(name, true)
+
+        for address in (address_list .. ","):gmatch("(.-),") do
+          local hwnd = reaper.JS_Window_HandleFromAddress(address)
+          if reaper.DockIsChildOfDock(hwnd) > 0 then
+            scr.hwnd = hwnd
+            break
+          end
+        end
+      end
+
+      reaper.JS_Window_AttachTopmostPin(scr.hwnd)
     end
   end
 
-  if gui.reinit then
+  if gui.reinit or gui.reopen then
     gui.reinit = nil
-    local _, wnd_x, wnd_y = gfx.dock(-1, 0, 0, 0, 0)
-    macAdjustGfxH()
-    wnd_y = macYoffset(retinaDivide(gui.wnd_h_save), retinaDivide(gui.wnd_h), wnd_y)
-    gui.wnd_h_save = nil
-    if gfx.dock(-1)&1 == 0 and scr.main_w_rs then gui.wnd_w = config.main_w_rs end
-    gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
-    refocus()
-  end
-  
-  if gui.reopen then
     gui.reopen = nil
-    local _, wnd_x, wnd_y = gfx.dock(-1, 0, 0, 0, 0)
-    gui.wnd_h_save = scr.o_r and config.wnd_h_save or gui.wnd_h_save
-    wnd_y = scr.o_r and config.wnd_y or wnd_y
+    local cur_dock, wnd_x, wnd_y = gfx.dock(-1, 0, 0, 0, 0)
+    
+    macAdjustGfxH()
+    
     wnd_y = macYoffset(retinaDivide(gui.wnd_h_save), retinaDivide(gui.wnd_h), wnd_y)
-    config.wnd_h_save = not scr.o_r and gui.wnd_h or gui.wnd_h_save
-    config.wnd_y = not scr.o_r and select(3, gfx.dock(-1, 0, 0, 0, 0)) or config.wnd_y
-    scr.o_r = nil
     gui.wnd_h_save = nil
-    if scr.main_w_rs and gui.view == "main" then
-      scr.main_w_rs = nil
-      gui.wnd_w = getMainW()
-      gui.w = getMainW() - gui.border * 2
-    end
-    if gfx.dock(-1)&1 == 0 or config.undock or gfx.getchar(65536)&4 ~= 4 then
-      gfx.quit()
-      gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h),dock, wnd_x, wnd_y)
+    
+    if gfx.dock(-1)&1 == 0 and scr.main_w_rs then gui.wnd_w = config.main_w_rs end
+
+    gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    
+    if reaper.JS_Window_SetTitle then reaper.JS_Window_SetTitle(scr.hwnd, name) end
+    
+    gfx.dock(dock)
+    
+    if cur_dock > 0 and dock == 0 and reaper.JS_Window_AttachTopmostPin then
+      reaper.JS_Window_AttachTopmostPin(scr.hwnd)
     end
     
     refocus()
-    
-    if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
-      reaper.JS_Window_AttachTopmostPin(reaper.JS_Window_Find(name, true))
-    end
   end
 end
 
