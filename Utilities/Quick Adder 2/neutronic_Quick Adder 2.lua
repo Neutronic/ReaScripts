@@ -5031,7 +5031,7 @@ function mainView()
     local sb_pad = 2 * math.floor(config.multi)
     local sb_shrink = 2 * sb_pad
     
-    local results_area = gfx.h - gui.Row1.h - gui.row_h - gui.border*(2 + (config.undock and 0 or 4))
+    local results_area = gui.wnd_h - gui.Row1.h - gui.row_h - gui.border*2
     
     local h = math.floor((results_area - sb_shrink) / 100 * gui.result_rows / (#scr.results_list / 100))
     
@@ -5076,7 +5076,6 @@ function mainView()
                                    y1 = gui.Scrollbar.y2,
                                    font = 3, font_c = bttn_c, pad_y = config.undock and -2 * config.multi or 0,
                                    txt_align = gui.txt_align["horiz"]})
-      gui.Scrollbar_slot:drawRect()
       gui.Scrollbar_slot:drawRect()
       
       gui.Scrollbar_down.y1 = (config.undock and gui.Scrollbar_down.y2 or gfx.h-6) - select(2, gfx.measurestr(name2))
