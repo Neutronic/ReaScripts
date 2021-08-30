@@ -2452,8 +2452,6 @@ function gui:init()
       gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     end
     
-    --refocus()
-    
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
       scr.hwnd = reaper.JS_Window_FindTop(name, true)
       
@@ -2470,12 +2468,15 @@ function gui:init()
       end
 
       reaper.JS_Window_AttachTopmostPin(scr.hwnd)
+      
+      refocus()
     end
   end
 
   if gui.reinit or gui.reopen then
     gui.reinit = nil
     gui.reopen = nil
+
     local cur_dock, wnd_x, wnd_y = gfx.dock(-1, 0, 0, 0, 0)
     
     macAdjustGfxH()
@@ -2484,12 +2485,12 @@ function gui:init()
     gui.wnd_h_save = nil
     
     if gfx.dock(-1)&1 == 0 and scr.main_w_rs then gui.wnd_w = config.main_w_rs end
-
-    gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     
     if reaper.JS_Window_SetTitle then reaper.JS_Window_SetTitle(scr.hwnd, name) end
     
     gfx.dock(dock)
+
+    gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     
     if cur_dock > 0 and dock == 0 and reaper.JS_Window_AttachTopmostPin then
       reaper.JS_Window_AttachTopmostPin(scr.hwnd)
@@ -4650,10 +4651,10 @@ function mainView()
     if gfx.dock(-1)&1 == 0 then
       config.main_w_rs = gfx.w
     else
-      scr.main_w_rs = gfx.w
+      --scr.main_w_rs = gfx.w
     end
     gui.wnd_w = scr.main_w_rs or config.main_w_rs
-    gui.w = (scr.main_w_rs or config.main_w_rs) - gui.border * (config.undock and 2 or 5)
+    gui.w = (gfx.w--[[scr.main_w_rs]] or config.main_w_rs) - gui.border * (config.undock and 2 or 5)
   end
 
   if gui.result_rows_init ~= gui.result_rows or scr.refresh_list then
@@ -6099,7 +6100,7 @@ function guiDock()
     scr.o_r = true
     config.undock = true
   end
-  
+  gui.view_change = true
   gui.reopen = true
 end
 
@@ -6210,7 +6211,7 @@ function main()
     scr.dock = gfx.dock(-1)&1
     if scr.dock == 1 then
       config.undock = false
-      scr.main_w_rs = gfx.w
+      --scr.main_w_rs = gfx.w
     else
       scr.main_w_rs = nil
       config.undock = true
@@ -6365,7 +6366,7 @@ function main()
     if scr.temp_undock then
       scr.temp_undock = nil
       config.undock = false
-      gui.reopen = true
+      gui.open = nil
       gui.view = "main"
       gui:init()
       reaper.defer(main)
