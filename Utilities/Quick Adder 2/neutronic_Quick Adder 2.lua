@@ -2447,9 +2447,12 @@ function gui:init()
     
     isRetina(gfx.ext_retina)
     
-    if not init_retina and config.retina then -- reopen if first time retina
-      gfx.quit()
-      gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    local w_upd = os_is.mac and gfx.w or select(4, gfx.dock(-1, 0, 0, 0, 0))
+    
+    if w_upd < gui.wnd_w and os_is.win or not init_retina and config.retina then -- reopen if first time retina or size wasn't doubled
+      if w_upd < gui.wnd_w and os_is.win then config.retina = nil end
+
+      gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     end
     
     if reaper.JS_Window_AttachTopmostPin and reaper.JS_Window_Find then
@@ -2489,8 +2492,16 @@ function gui:init()
     if reaper.JS_Window_SetTitle then reaper.JS_Window_SetTitle(scr.hwnd, name) end
     
     gfx.dock(dock)
-
+    
     gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    
+    local w_upd = os_is.mac and gfx.w or select(4, gfx.dock(-1, 0, 0, 0, 0))
+
+    if gui.wnd_w and w_upd < gui.wnd_w and os_is.win then
+      config.retina = nil
+
+      gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
+    end
     
     if cur_dock > 0 and dock == 0 and reaper.JS_Window_AttachTopmostPin then
       reaper.JS_Window_AttachTopmostPin(scr.hwnd)
@@ -4576,7 +4587,7 @@ function gui.parseResult(str)
   shortcut = ""  
    
   if fx_type == "JS" then
-    path = name:match("Video processor") and "Built-in effect" or "/Effects/" .. path
+    path = name:match("Video processor") and "Built-in effect/" or "/Effects/" .. path
   elseif name:match("SWS.-:") or name:match("^Custom.-:") then
     local ext = name:match("SWS.-:") and "SWS" or name:match("^Custom.-:") and "Custom"
           or "Ext"
