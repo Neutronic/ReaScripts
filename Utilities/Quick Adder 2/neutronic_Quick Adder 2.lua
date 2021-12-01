@@ -747,7 +747,11 @@ end
 
 function retinaDivide(val)
   if not val then return end
+  
+  if not os_is.mac then return val end
+  
   val = config.retina and val / 2 or val
+  
   return math.floor(val)
 end
 
@@ -2444,14 +2448,10 @@ function gui:init()
     local init_retina = config.retina
     
     gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
-    
+
     isRetina(gfx.ext_retina)
     
-    local w_upd = os_is.mac and gfx.w or select(4, gfx.dock(-1, 0, 0, 0, 0))
-    
-    if w_upd < gui.wnd_w and os_is.win or not init_retina and config.retina then -- reopen if first time retina or size wasn't doubled
-      if w_upd < gui.wnd_w and os_is.win then config.retina = nil end
-
+    if not init_retina and config.retina then -- reopen if first time retina
       gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
     end
     
@@ -2494,14 +2494,6 @@ function gui:init()
     gfx.dock(dock)
     
     gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
-    
-    local w_upd = os_is.mac and gfx.w or select(4, gfx.dock(-1, 0, 0, 0, 0))
-
-    if gui.wnd_w and w_upd < gui.wnd_w and os_is.win then
-      config.retina = nil
-
-      gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
-    end
     
     if cur_dock > 0 and dock == 0 and reaper.JS_Window_AttachTopmostPin then
       reaper.JS_Window_AttachTopmostPin(scr.hwnd)
