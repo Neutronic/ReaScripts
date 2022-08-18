@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Neutronic Scripts" commit="22f70e9e22f4e4f245601e41def9de1a32d66089">
+<index version="1" name="Neutronic Scripts" commit="c19fae4492a2380b77f892a716dc50ab4143568c">
   <category name="FX">
     <reapack name="neutronic_Show track or take envelope for last touched parameter.lua" type="script" desc="Show track or take envelope for last touched parameter">
       <metadata>
@@ -121,7 +121,7 @@
   <category name="Utilities/Quick Adder 2">
     <reapack name="neutronic_Quick Adder 2.lua" type="script" desc="Quick Adder 2">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
@@ -565,6 +565,11 @@ sends selected tracks (or track under mouse) to it
 # fix QA2 crash when scrolling zero results list
 # macOS: improve automatic GUI positioning]]></changelog>
         <source main="main">https://github.com/Neutronic/ReaScripts/raw/22f70e9e22f4e4f245601e41def9de1a32d66089/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
+      </version>
+      <version name="2.49.3" author="Neutronic" time="2022-08-18T23:07:29Z">
+        <changelog><![CDATA[# improved string construction for FX_AddByName functions
+# fix missing VST3 plugins when filter is FOL]]></changelog>
+        <source main="main">https://github.com/Neutronic/ReaScripts/raw/c19fae4492a2380b77f892a716dc50ab4143568c/Utilities/Quick%20Adder%202/neutronic_Quick%20Adder%202.lua</source>
       </version>
     </reapack>
   </category>
