@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Unified solution for adding FX, inserting track templates and running actions in REAPER.
-Version: 2.49
+Version: 2.49.3
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,11 +10,8 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  + ability to control QA2 with external actions (downloaded separately)
-  + post scanning status to REAPER info bar when siliently refreshing database
-  # improve QA2 tab naming when docked
-  # fix QA2 crash when scrolling zero results list
-  # macOS: improve automatic GUI positioning
+  # improved string construction for FX_AddByName functions
+  # fix missing VST3 plugins when filter is FOL
 --]]
 
 local rpr = {}
@@ -315,12 +312,15 @@ end
 function getFXfolder(str, type_n)
   str = str:lower()
   local fx_folder = ""
-  
+
   if not str then return fx_folder end
+
   if config and not config.fol_search then return fx_folder end
   
   if type_n == 3 then -- if VST
     local vst_id, vst_file = str:match("(.-)//(.+)")
+    vst_id = vst_id:gsub("{%w+", "")
+
     for i = 1, fx_folders and #fx_folders or 0 do
       if fx_folders[i].content and (vst_id ~= "0" and fx_folders[i].content:find(vst_id) or
          fx_folders[i].content:find(vst_file .. "[\n\r]")) then
@@ -329,10 +329,11 @@ function getFXfolder(str, type_n)
     end
   else
     str = str:gsub("[^%w%.\n\r]", "_")
+    
     for i = 1, fx_folders and #fx_folders or 0 do
       if fx_folders[i].content and fx_folders[i].content:match("item%d+_" .. magicFix(str)) then
-      if str:match("killer") then a = str end
         local fx_n = fx_folders[i].content:match("item(%d+)_" .. magicFix(str))
+
         if fx_folders[i].content:find("type" .. fx_n .. "_" .. type_n) then
           fx_folder = fx_folder .. "\t" .. fx_folders[i].name
         end
@@ -1390,8 +1391,9 @@ function isInput()
 end
 
 function parseResultsList(v)
-  local fx_type, name, path, undo_name = v:match("(%w-:)(.-)|,|(.-)|,|.+")
+  local fx_type, name, path, id, undo_name = v:match("(%w-:)(.-)|,|(.-)|,|.-|,|(.-)|,|.*")
   name = name:gsub("\t.+", "") -- remove folders
+  
   if fx_type == "JS:" then -- if JS
     if not name:match("Video processor") then
       undo_name = name
@@ -1406,7 +1408,12 @@ function parseResultsList(v)
   else -- if VST or AU
     fx_type = fx_type:gsub("i", "")
     undo_name = name:gsub(" %(.+%)", "")
-    name = fx_type .. name
+
+    if fx_type == "AU:" or rpr.ver < 6.43 then
+      name = fx_type .. name
+    else
+      name = path .. "<" .. id
+    end
   end
   
   return name, undo_name
@@ -1687,7 +1694,7 @@ function getAu()
         if rpr.def_fx_filt and not fxExclCheck("au" .. au_i .. ":" .. au_name:lower(), true) then goto SKIP end
         
         local fx_folder = getFXfolder(au_name, 5)
-        
+
         cntr = cntr + 1
         if select(2, math.modf(cntr / 10)) == 0 then
           coroutine.yield(#tbl)
