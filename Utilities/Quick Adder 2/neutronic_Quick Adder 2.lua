@@ -10,7 +10,7 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # improved string construction for FX_AddByName functions
+  # improve string construction for FX_AddByName functions
   # fix missing VST3 plugins when filter is FOL
 --]]
 
