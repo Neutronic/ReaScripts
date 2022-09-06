@@ -1,7 +1,7 @@
 --[[
 Description: Quick Adder 2
 About: Unified solution for adding FX, inserting track templates and running actions in REAPER.
-Version: 2.49.3
+Version: 2.49.4
 Author: Neutronic
 Donation: https://paypal.me/SIXSTARCOS
 License: GNU GPL v3
@@ -10,8 +10,12 @@ Links:
   Quick Adder 2 forum thread https://forum.cockos.com/showthread.php?t=232928
   Quick Adder 2 video demo http://bit.ly/seeQA2
 Changelog:
-  # improve string construction for FX_AddByName functions
-  # fix missing VST3 plugins when filter is FOL
+  + add context menu (right-click) for search bar
+  + add "Clear Search", "Copy" and "Paste" to search context menu
+  + add "Ctrl(Cmd) + C" shortcut to copy selected search text
+  + add "Ctrl(Cmd) + V" shortcut to paste text from clipboard
+  # use up-to-date command IDs with favorite scripts/extensions
+  # set initial GUI size to 4k for retina screens
 --]]
 
 local rpr = {}
@@ -106,7 +110,16 @@ rpr.path = reaper.GetResourcePath():gsub("\\", "/")
 
 function getResolution(wantWorkArea)
   local _, _ , vp_w, vp_h = reaper.my_getViewport(0,0,0,0,0,0,0,0, wantWorkArea)
-  return vp_w, vp_h
+  
+  local isRetina = function()
+    gfx.ext_retina = 1
+    gfx.init()
+    local retina = gfx.ext_retina == 2 and true or nil
+    gfx.quit()
+    return retina
+  end
+  
+  return vp_w, vp_h, isRetina()
 end
 
 local res_multi = {["|720p"] = 1,
@@ -117,12 +130,13 @@ local res_multi = {["|720p"] = 1,
             }
 
 function getResolutionMulti()
-  local h = select(2, getResolution(false))
+  local h, retina = select(2, getResolution(false))
+  
   if h >= 4320 then -- 8k and up
     return res_multi["|8k"]
   elseif h >= 2880 then -- 5k and up
     return res_multi["|5k"]
-  elseif h >= 2160 then -- 4k and up
+  elseif h >= 2160 or retina then -- 4k and up
     return res_multi["|4k"]
   elseif h >= 1080 then -- full HD and up
     return res_multi["|1080p"]
@@ -510,7 +524,7 @@ if not pcall(doFile, scr.config) then
             mode = "ALL",
             pin = true,
             reminder = true,
-            results_max = 5,
+            results_max = 7,
             global_types_n = 0,
             os = cur_os,
             db_scan = 3,
@@ -1148,11 +1162,19 @@ function doAdd()
   
   if scr.results_list[gui.Results.sel]:match("^(%w+).+") == "ACTION" and
      (gui.m_cap == 0 or gui.m_cap == mouse_mod.lmb) then
+    
+    --[[
     local section = select(3, gui.parseResult(scr.results_list[gui.Results.sel])):
           match("(.+)/.+")
+          
     local id = select(6, gui.parseResult(scr.results_list[gui.Results.sel]))
+    --]]
+    
+    local section, _, named_cmd, id = select(3, gui.parseResult(scr.results_list[gui.Results.sel]))
+    section = section:match("(.+)/.+")
+    local id = #named_cmd > 0 and reaper.NamedCommandLookup("_" .. named_cmd) or id
+
     if section == "Main" then
-      a = id
       reaper.Main_OnCommand(id, 0)
       scr.result_is_action = true
     elseif section == "MIDI Editor" or section == "MIDI Event List Editor" then
@@ -2447,16 +2469,25 @@ function gui:init()
 
   if not gui.open then
     if not config.undock then scr.main_w_rs = gui.wnd_w end
-    scr.vp_w, scr.vp_h = getResolution(true) -- of main screen
-    local wnd_x = config.wnd_x or (scr.vp_w - gui.wnd_w)/2 - 8
-    local wnd_y = config.wnd_y or (os_is.win or os_is.lin and 200) or (scr.vp_h - gui.wnd_h)/2 + 150
+    
+    scr.vp_w, scr.vp_h, scr.retina = getResolution(true) -- of main screen
+    
+    config.retina = scr.retina
+   
+    local wnd_x = config.wnd_x or (scr.vp_w - gui.wnd_w / (scr.retina and 2 or 1)) / 2 -
+                 (os_is.win and 8 or 0)
+                 
+    local wnd_y = config.wnd_y or ((os_is.win or os_is.lin) and 200) or
+                  (scr.vp_h - gui.wnd_h)/2 + 150 * (scr.retina and 2 or 1)
     gui.open = true
-    gfx.ext_retina = 1
+    
+    --gfx.ext_retina = 1
+    
     local init_retina = config.retina
     
     gfx.init(name, retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
 
-    isRetina(gfx.ext_retina)
+    --isRetina(gfx.ext_retina)
     
     if not init_retina and config.retina then -- reopen if first time retina
       gfx.init("", retinaDivide(gui.wnd_w), retinaDivide(gui.wnd_h), dock, wnd_x, wnd_y)
@@ -2824,8 +2855,10 @@ function a_mouse()end
 
 function gui:onClickSpecial()
   if not self:isOver() then return end
+  
   if (gui.m_cap&mouse_mod.rmb == mouse_mod.rmb or gui.m_cap&64 == 64) and
       gui.over == self.id and not gui.active and not gui.important then
+      
     gui.active = self
     gui.active.m_cap = gui.m_cap 
   elseif gui.m_cap == 0 and gui.active and gui.active:isOver() then
@@ -2845,12 +2878,13 @@ function gui:onClick()
     return
   end
   
-  if (gui.m_cap&1 == 1) then
+  if (gui.m_cap&1 > 0) then
     if not gui.loop_start then
       gui.loop_start = self.id
     elseif gui.loop_start and gui.loop_start == self.id and not gui.active then
       gui.click_ignore = true
     end
+
     if (self.bttn or self.on_click) and not gui.click_ignore and
         not gui.active and not gui.important and self.id then
       gui.active = self
@@ -2863,6 +2897,7 @@ function gui:onClick()
     end
   elseif gui.m_cap&3 == 0 and gui.active and gui.active:isOver() and
         (gui.active.id:match("result.+(%d+)") or not gui.active.on_select) then
+
     if not timers.double_click then
       timers.double_click = timer:new():start(config.dbl_click_speed)
       double_clicked_id = gui.active.id
@@ -3544,11 +3579,7 @@ function gui:textBox(ch, shrink)
   function a_highlight()end
   
   local clearHl = function()
-    gui.str_hl = nil
-    gui.str_hl_start = nil
-    gui.txt_hl = nil
-    gui.str_hl_end = nil
-    gui.str_hl_dbl_click = nil
+    scr.actions.clearHl()
   end
 
   if double_clicked and gui.over == double_clicked_id and
@@ -3559,7 +3590,7 @@ function gui:textBox(ch, shrink)
     gui.str_hl_start = 1
     gui.str_hl_end = gui.str:len()
     gui.str_hl_dbl_click = true
-  elseif gui.clicked and gui.txt_hl then
+  elseif gui.clicked and gui.txt_hl and gui.clicked.m_cap == 1 then
     clearHl()
   end
  
@@ -3602,6 +3633,7 @@ function gui:textBox(ch, shrink)
       end
       clearHl()
     end
+    
     if gui.m_cap&mouse_mod.shift == mouse_mod.shift and process then
       if not gui.str_hl or gui.str:len() - b_count_old < gui.str_hl_start then -- if no HL or growing HL
         gui.str_hl_start = gui.m_cap&mouse_mod.ctrl == 0 and
@@ -3642,6 +3674,7 @@ function gui:textBox(ch, shrink)
       end
       clearHl()
     end
+    
     if gui.m_cap&mouse_mod.shift == mouse_mod.shift and process then
       if not gui.str_hl or gui.str:len() - b_count_old >= gui.str_hl_end then -- if no HL or growing HL
         gui.str_hl_start = gui.str_hl and gui.str_hl_start or
@@ -3678,7 +3711,7 @@ function gui:textBox(ch, shrink)
   gfx.x = self.x1 + self.pad_x * config.multi + gfx.measurestr(gui.str_a .. " ") - gfx.measurestr(" ")
 
   
-  if gui.active and gui.active.id == self.id and not gui.str_hl_dbl_click then-- and not gui.txt_hl then
+  if gui.active and gui.active.id == self.id and not gui.str_hl_dbl_click then
     local defineHl = function()
       if not gui.str_a_temp then
         gui.str_a_temp = gui.str:sub(0, gui.str:len() - gui.b_count)
@@ -3698,18 +3731,23 @@ function gui:textBox(ch, shrink)
         end
         gui.str_hl_start = gui.str:len() - math.max(gui.b_count_i, gui.b_count) + 1
         gui.str_hl_end = gui.str:len() - math.min(gui.b_count_i, gui.b_count)
-      elseif gui.b_count_i and gui.b_count_i == gui.b_count then
+      elseif gui.b_count_i and gui.b_count_i == gui.b_count and
+             gui.clicked and gui.clicked.m_cap == 1
+      then
         clearHl()
       end
+      
+      ::SKIP::
     end
     
     if gui.str_x2 - gfx.measurestr(gui.str:match(".+(.)"))/2 <= gfx.mouse_x and
-       #gui.str > 1 then
+       #gui.str > 1 and gui.m_cap == 1
+    then
       gui.b_count = 0
       defineHl()
       carriage_suspend = true
       timers.carriage_suspend = timer:new():start(0.5)
-    else
+    elseif gui.m_cap == 1 then
       local str = gui.str
       for i = 1, #gui.str + 1 do
         local str_a = gfx.measurestr(str:match("(.+).") or "")
@@ -3734,8 +3772,14 @@ function gui:textBox(ch, shrink)
 
   if gui.focus == 2 and (gui.m_cap&mouse_mod.lmb == 0 or
      gui.m_cap&mouse_mod.lmb > 0 and (carriage_suspend or gui.over and gui.over:match("^scrollbar") or
-     gui.active and gui.active.id:match("^scrollbar"))) then
-    self:carriage(ch)
+     gui.active and gui.active.id:match("^scrollbar")))
+  then
+
+     local w = self.x1 + self.pad_x + self.w - (shrink or 0) - gui.border * math.floor(config.multi) * 3
+
+     if gfx.x - config.multi * 3 < w then
+      self:carriage(ch)
+     end
   else
     gui.blink = 0
   end
@@ -3744,6 +3788,41 @@ function gui:textBox(ch, shrink)
 end
 
 function a_actions()end
+
+scr.actions.copy = function()
+  if not reaper.CF_SetClipboard or not gui.str_hl then return end
+  
+  reaper.CF_SetClipboard(gui.str_hl)
+end
+
+scr.actions.paste = function()
+  if not reaper.CF_GetClipboard then return end
+  
+  local cb = reaper.CF_GetClipboard("")
+  cb = cb:gsub('[\n\r\t]', '')
+  
+  if #cb == 0 then return end
+  
+  if not gui.str_hl_start then goto SKIP end
+  
+  gui.str_a = gui.str:sub(1, gui.str_hl_start - 1)
+  gui.str_b = gui.str:sub(gui.str_hl_end + 1, gui.str:len())
+  
+  ::SKIP::
+  
+  scr.actions.clearHl()
+  gui.str = gui.str_a .. cb .. gui.str_b
+  gui.str_a = gui.str_a .. cb
+  gui.b_count = #gui.str - #gui.str_a
+end
+
+scr.actions.clearHl = function()
+  gui.str_hl = nil
+  gui.str_hl_start = nil
+  gui.txt_hl = nil
+  gui.str_hl_end = nil
+  gui.str_hl_dbl_click = nil
+end
 
 scr.actions.defMode = function(str)
   if str == "LAST USED" then
@@ -4720,7 +4799,7 @@ function mainView()
   
   gui.Row2.Search = gui.Row2:setChild{id = "search", txt_field = true, hover_special = true,
                                       float_r_auto_w = gui.Row2.dd_Mode, auto_w = true}
- 
+  
   if config.reminder and gui.reminder_seen and not gui.focused then config.reminder = false end
   if config.reminder then
     gui.Row1.Reminder:setStyle("reminder"):drawRect()
@@ -4791,6 +4870,8 @@ function mainView()
 
   gui.Row2.Search.on_select = true
   gui.Row2.Search:hover(true)
+  
+  gui.Row2.Search:onClickSpecial()
    
   gui.scrollbar_w = math.floor(18 * config.multi)
   
@@ -5319,18 +5400,22 @@ function a_scrollwheel()end
     gui.str_hl_end = gui.str:len()
     gui.str_hl = gui.str
     gui.txt_hl = true
-  --[[elseif gui.m_cap == mouse_mod.ctrl and gui.ch == 3 and gui.str_hl then -- CTRL+C
-    reaper.CF_SetClipboard(gui.str_hl)
-  elseif gui.m_cap == mouse_mod.ctrl and gui.ch == 22 then -- CTRL+V
-    local cb = reaper.CF_GetClipboard("")
-    gui.str = gui.str_a .. cb .. gui.str_b
-    gui.str_a = gui.str_a .. cb]]
+  elseif gui.m_cap == mouse_mod.ctrl and gui.ch == 3 and
+         gui.view == "main"
+  then -- CTRL + C
+    scr.actions.copy()
+  elseif gui.m_cap == mouse_mod.ctrl and gui.ch == 22 and
+         gui.view == "main"
+  then -- CTRL + V
+    scr.actions.paste()
   elseif gui.m_cap == mouse_mod.alt and gui.ch == 326 and
-     #scr.results_list > 0 and gui.view == "main" then -- ALT+F
+     #scr.results_list > 0 and gui.view == "main"
+  then -- ALT + F
     scr.actions.fav(gui.Results.sel)  
   elseif gui.m_cap == mouse_mod.alt and
-         gui.ch == 343 and gui.view == "main" then -- ALT+W
-    gui.clicked = {id = "float", m_cap = 1, o = gui.Row1.Float}
+         gui.ch == 343 and gui.view == "main"
+  then -- ALT + W
+    scr.actions.float()
   elseif gui.ch == ignore_ch.esc and gui.m_cap == 0 and gui.view == "main" then
     if gui.str == "" and not gui.dd_items then
       if not get_db_txt then gfx.quit() end
@@ -5348,7 +5433,7 @@ function a_scrollwheel()end
          gui.m_cap&mouse_mod.ctrl ~= mouse_mod.ctrl then
     gui.clicked = {id = "dd_1_mode", m_cap = 1, o = gui.Row2.dd_Mode}
   elseif gui.m_cap == 0 and gui.ch == ignore_ch.tilde and gui.view == "main" then
-    gui.clicked = {id = "pin", m_cap = 1, o = gui.Row1.Pin}
+    scr.actions.pin()
   elseif gui.m_cap == 0 and gui.ch == ignore_ch.f1 then
     help()
   elseif gui.m_cap == 0 and gui.ch == ignore_ch.f2 and gui.view == "prefs" then
@@ -6135,6 +6220,47 @@ function floatModePopUp()
   end
 end
 
+function searchContextMenu()
+  if not reaper.CF_GetClipboard or not reaper.CF_SetClipboard then return end
+  
+  gfx.x = gfx.mouse_x
+  gfx.y = gfx.mouse_y
+  local cb = reaper.CF_GetClipboard("")
+  cb = cb:gsub('[\n\r\t]', '')
+  
+  local str = ''
+  
+  local menu = {}
+  
+  menu[#menu+1] = {
+    txt = (config.clear_search and '!' or '') .. 'Clear search after insertion|',
+    act = function()
+      scr.actions.cb({id = 'cb_clear_search'})
+    end
+  }
+  
+  menu[#menu+1] = {
+    txt = (gui.str_hl and '' or '#') .. 'Copy',
+    act = scr.actions.copy
+  }
+
+  menu[#menu+1] = {
+    txt = (#cb > 0 and '' or '#') .. 'Paste',
+    act = scr.actions.paste
+  }
+  
+  for i = 1, #menu do
+    str = str .. menu[i].txt .. '|'
+  end
+  
+  local retval = gfx.showmenu(str)
+  
+  if retval > 0 then
+    menu[retval].act()
+  end
+
+end
+
 function filterTrayPopUp()
   gfx.x = gui.Row2.dd_Mode.x1
   gfx.y = gui.Row2.dd_Mode.y1
@@ -6280,7 +6406,7 @@ function main()
   end
   
   gfx.setcursor(gui.m_cursor_n, gui.m_cursor)
-  
+
   if gui.clicked and not gui.click_ignore then
     if gui.clicked.m_cap&1 == 1 then -- if left mouse click
       pcall(scr.actions[gui.clicked.id:gsub("(.-)_.+", "%1")], gui.clicked.o)
@@ -6290,7 +6416,10 @@ function main()
       filterTrayPopUp()
     elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == "float" then
       floatModePopUp()
+    elseif gui.clicked.m_cap&2 == 2 and gui.clicked.id == "search" then
+      searchContextMenu()
     end
+    
     gui.clicked = nil
   end
   
